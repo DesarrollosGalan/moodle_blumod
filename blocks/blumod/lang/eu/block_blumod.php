@@ -1,0 +1,28 @@
+﻿<?php
+defined('MOODLE_INTERNAL') || die();
+
+$string['addblu'] = 'Gehitu';
+$string['modblu'] = 'Aldatu';
+$string['delblu'] = 'Ezabatu';
+$string['blocksettings'] = 'BLU block ezarpenak';
+$string['bludesc'] = 'BLU deskripzioa';
+$string['blumod'] = 'BLU block kudeaketa';
+$string['blumod:addinstance'] = 'BLU block gehitu';
+$string['blumod:manageblus'] = 'BLU kudeaketa BLU';
+$string['blumod:myaddinstance'] = 'BLU block "my" gehitu';
+$string['blumod:view'] = 'BLU block ikusi';
+$string['createblu'] = 'BLU kudeaketa: Sortu';
+$string['defaulttext'] = 'BLU ezaugarrien lehenetsi textua';
+$string['defaulttitle'] = 'BLU ezaugarrien lehenetsi izenburua';
+$string['editblusettings'] = 'BLU kudeaketa: Editatu';
+$string['managerblumod'] = 'BLU kudeaketa';
+$string['mapblumod'] = 'BLU MAP esleitu dagozkion baliabideak';
+$string['pluginname'] = 'BLU bloke';
+$string['saved'] = 'Datuak gordeta';
+$string['deleted'] = 'Datuak ezabatuta';
+$string['blus'] = 'BLUs';
+$string['preselectors'] = 'BLU honek honako eskakizun hauek ditu';
+$string['subselectors'] = 'BLU honek hurrengo osagai hauek ditu';
+$string['availableresources'] = 'Baliabide eskuragarriak';
+$string['assignedresources'] = 'Baliabide esleituak';
+$string['reportblumod'] = 'Ikastaro batean dauden BLUei dagokien txostena';

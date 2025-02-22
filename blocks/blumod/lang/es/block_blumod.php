@@ -1,0 +1,28 @@
+﻿<?php
+defined('MOODLE_INTERNAL') || die();
+
+$string['addblu'] = 'Añadir';
+$string['modblu'] = 'Modificar';
+$string['delblu'] = 'Borrar';
+$string['blocksettings'] = 'Opciones BLU block';
+$string['bludesc'] = 'Descripción BLU';
+$string['blumod'] = 'Bloque Configuración BLU';
+$string['blumod:addinstance'] = 'Añadir bloque BLU';
+$string['blumod:manageblus'] = 'Configurar BLU';
+$string['blumod:myaddinstance'] = 'BLU block "my" add';
+$string['blumod:view'] = 'Ver bloque BLU';
+$string['createblu'] = 'Crear bloque configuración BLU';
+$string['defaulttext'] = 'Texto por defecto de opciones BLU';
+$string['defaulttitle'] = 'Título por defecto de opciones BLU';
+$string['editblusettings'] = 'Editar bloque de opciones BLU';
+$string['managerblumod'] = 'Configurador BLU';
+$string['mapblumod'] = 'Asignar recursos BLU MAP';
+$string['pluginname'] = 'Bloque BLU';
+$string['saved'] = 'Datos guardados';
+$string['deleted'] = 'Data borrados';
+$string['blus'] = 'BLUs';
+$string['preselectors'] = 'Esta BLU tiene como prerrequisito a';
+$string['subselectors'] = 'Esta BLU se compone de';
+$string['availableresources'] = 'Recursos disponibles';
+$string['assignedresources'] = 'Recursos asignados';
+$string['reportblumod'] = 'Informe en el curso acerca de BLUs';
