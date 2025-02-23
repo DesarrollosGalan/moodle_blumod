@@ -66,8 +66,6 @@ class resource_selector {
 
         return $output;
 
-
-        return $output;
     }
 
     private function loadResources()
