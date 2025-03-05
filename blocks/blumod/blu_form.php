@@ -48,6 +48,9 @@ class block_blumod_blu_form extends moodleform {
         $mform->addElement('text','description', get_string('bludesc', 'block_blumod'),'maxlength="254" size="50"');
         $mform->addRule('description', get_string('required'), 'required', null, 'client');
         $mform->setType('description', PARAM_TEXT);
+        
+        $mform->addElement('text', 'competencyid', get_string('blucompetencyid','block_blumod'), 'size="50"');
+        $mform->setType('competencyid', PARAM_INT);
 
         $mform->addElement('hidden','id');
         $mform->setType('id', PARAM_INT);

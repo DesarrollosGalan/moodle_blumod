@@ -29,6 +29,6 @@ echo html_writer::start_tag('div');
 echo html_writer::start_tag('p');
 echo html_writer::end_tag('p');
 $blumod_selector = new resource_selector($courseid, $id);
-echo $blumod_selector->display($courseid);
+echo $blumod_selector->display();
 echo html_writer::end_tag('div');
 

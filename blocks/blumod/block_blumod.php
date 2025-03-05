@@ -98,6 +98,12 @@ class block_blumod extends block_base {
         $html .= html_writer::end_tag('p');
 
         $html .= html_writer::start_tag('p');
+        $linktext = get_string('assigncompetencies', 'block_blumod');
+        $url = new moodle_url('/blocks/blumod/assign_competencies.php', ['courseid' => $COURSE->id]);
+        $html .= html_writer::link($url, $linktext);
+        $html .= html_writer::end_tag('p');
+
+        $html .= html_writer::start_tag('p');
         $linktext = get_string('reportblumod', 'block_blumod');
         $url = new moodle_url('/blocks/blumod/reportcourse.php', ['courseid' => $COURSE->id, 'blumodid' => '']);
         $html .= html_writer::link($url, $linktext);

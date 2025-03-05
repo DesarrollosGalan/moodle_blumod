@@ -45,7 +45,6 @@ $PAGE->set_url($url);
 
 
 if ($data = $bluform->get_data()) {
-  // In this case you process validated data. $bluform->get_data() returns data posted in form.
   
   if (!isset($blu->id)) {
       $blu->description = $data->description;
@@ -64,12 +63,7 @@ $PAGE->set_heading($strtitle);
 echo $OUTPUT->header();
 echo $OUTPUT->heading($strtitle);
 
-// this branch is executed if the form is submitted but the data doesn't validate and the form should be redisplayed
-// or on the first display of the form.
-
-// Set default data (if any).
 $bluform->set_data($blu);
-// Displays the form.
 $bluform->display();
 
 echo $OUTPUT->footer();
