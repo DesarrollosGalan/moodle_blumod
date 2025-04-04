@@ -28,6 +28,8 @@ require_once '../../config.php';
 require_once $CFG->dirroot.'/blocks/blumod/lib.php';
 require_once $CFG->dirroot.'/blocks/blumod/classes/competencyselector.php';
 
+xdebug_break();
+
 global $DB, $CFG, $PAGE;
 
 $courseid = required_param('courseid', PARAM_INT);
@@ -36,6 +38,7 @@ $course = $DB->get_record('course', ['id'=>$courseid], '*', MUST_EXIST);
 $url = new moodle_url('/blocks/blumod/assign_competencies.php', ['courseid'=>$courseid]);
 $PAGE->set_url($url);
 require_login($course);
+
 
 // TO ADD --->>   $PAGE->requires->js('/blocks/blumod/assign_competencies.js',true);
 
@@ -57,8 +60,8 @@ echo $OUTPUT->header();
 // Selector BLU Competencies
 echo html_writer::start_tag('div');
 echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
-$blu_selector = new competency_selector($courseid);
-echo $blu_selector->display();
+$competency_selector = new competency_selector($courseid);
+echo $competency_selector->display();
 echo html_writer::end_tag('div');
 
 echo html_writer::start_tag('div', ['id' => 'resources']);

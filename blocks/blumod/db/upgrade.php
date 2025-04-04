@@ -41,7 +41,7 @@ function xmldb_block_blumod_upgrade($oldversion) {
     if ($oldversion < 202503021805) {
         $table  = new xmldb_table('block_blucompetency');
 
-        $field1 = new xmldb_field('id', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, sequence: true);
+        $field1 = new xmldb_field(name: 'id', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, sequence: true);
         $field2 = new xmldb_field('competencyid', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, sequence: null, default: '0');
         $field3 = new xmldb_field('bluid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, sequence: null, default: '0'); 
 
@@ -60,6 +60,19 @@ function xmldb_block_blumod_upgrade($oldversion) {
         }       
         upgrade_block_savepoint(true, 202503021805, 'blumod', allowabort: false);
     
-}
+    }
+
+    if ($oldversion < 202503121903) {
+        $table  = new xmldb_table('block_blumod');
+        $field1 = new xmldb_field(name: 'course', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, sequence: false);
+        $index1 = new xmldb_index('ix_course', XMLDB_INDEX_NOTUNIQUE, array('course'));
+        $table->addField($field1);
+        $table->addIndex($index1);
+        $dbman->add_field($table, $field1);
+        $dbman->add_index($table, $index1);
+        upgrade_block_savepoint(true, 202503121903, 'blumod', allowabort: false);
+
+    }
+
     return true;
 }

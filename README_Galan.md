@@ -27,12 +27,15 @@ git remote add upstream git://git.moodle.org/moodle.git
 
 * Mantener sync y actualizado este repo con el de Moodle
 
-Únicamente mantenemos sincronizadas las ramas *main* y *MOODLE_405_STABLE*. Los siguientes comandos se han guardado en el script bash **sync_upstream_moodle.sh**.
+Únicamente mantenemos sincronizadas la rama *MOODLE_405_STABLE*. Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Los siguientes comandos se han guardado en el script bash **sync_upstream_moodle.sh**.
 
 ```
 git fetch upstream
-for BRANCH in MOODLE_405_STABLE main; do
- git push origin refs/remotes/upstream/$BRANCH:$BRANCH
+for BRANCH in MOODLE_405_STABLE; do
+ git checkout $BRANCH
+ git merge upstream/$BRANCH
+ git push origin $BRANCH
+ # git push origin refs/remotes/upstream/$BRANCH:refs/heads/$BRANCH
 done
 ```
 

@@ -68,7 +68,7 @@ class competency_selector {
     private function loadCompetencies()
     {
         global $DB;
-        
+        // Usar el picker de competency??????
         $params = ['courseid' => $this->courseid,'deletioninprogress' => '0'];
         $sql = "SELECT cc.id, CONCAT(co.shortname, ' ', co.description) name
                      FROM {competency_coursecomp} cc

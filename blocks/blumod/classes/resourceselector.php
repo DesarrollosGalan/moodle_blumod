@@ -29,6 +29,7 @@ class resource_selector {
         $sibling = new stdClass();
         $sibling->blu = $this->bluid;
         $sibling->module = $id;
+        $sibling->course = $this->courseid;
         $DB->insert_record('block_blumod', $sibling);
     }
 
