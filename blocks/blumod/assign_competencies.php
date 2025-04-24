@@ -26,9 +26,10 @@
 
 require_once '../../config.php';
 require_once $CFG->dirroot.'/blocks/blumod/lib.php';
+require_once $CFG->dirroot.'/blocks/blumod/classes/bluselector.php';
 require_once $CFG->dirroot.'/blocks/blumod/classes/competencyselector.php';
 
-xdebug_break();
+// xdebug_break();
 
 global $DB, $CFG, $PAGE;
 
@@ -40,7 +41,7 @@ $PAGE->set_url($url);
 require_login($course);
 
 
-// TO ADD --->>   $PAGE->requires->js('/blocks/blumod/assign_competencies.js',true);
+$PAGE->requires->js('/blocks/blumod/assign_competencies.js',true);
 
 $context = context_course::instance($course->id);
 $PAGE->set_context($context);
@@ -57,14 +58,21 @@ $PAGE->navbar->add(get_string('assigncompetencies', 'block_blumod'));
 
 echo $OUTPUT->header();
 
-// Selector BLU Competencies
+// Selector BLUs
 echo html_writer::start_tag('div');
 echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
-$competency_selector = new competency_selector($courseid);
-echo $competency_selector->display();
+$blu_selector = new blu_selector($courseid);
+echo $blu_selector->display();
 echo html_writer::end_tag('div');
 
-echo html_writer::start_tag('div', ['id' => 'resources']);
+// Selector BLU Competencies
+// echo html_writer::start_tag('div');
+// echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
+// $competency_selector = new competency_selector($courseid);
+// echo $competency_selector->display();
+// echo html_writer::end_tag('div');
+
+echo html_writer::start_tag('div', ['id' => 'competencies']);
 
 echo html_writer::end_tag('div');
 

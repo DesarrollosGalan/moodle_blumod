@@ -28,3 +28,5 @@ $string['assignedresources'] = 'Baliabide esleituak';
 $string['reportblumod'] = 'Ikastaro batean dauden BLUei dagokien txostena';
 $string['blucompetencyid'] = 'Dagokion konpetentzia';
 $string['assigncompetencies'] = 'BLU eta konpetentzia lotzeko aukera';
+$string['availablecompetencies'] = 'Konpetentzia eskuragarriak';
+$string['assignedcompetencies'] = 'Konpetentzia esleituak';

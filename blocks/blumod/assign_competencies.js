@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", function() {
-    let bluSelector = document.getElementById("bluselector");
+    const bluSelector = document.getElementById("bluselector");
+
     if (!bluSelector) {
         return;
     }
@@ -7,12 +8,12 @@ document.addEventListener("DOMContentLoaded", function() {
     let bluid = bluSelector.value;
     if (bluid) {
         asignarBlu(bluid);
-        llamarresources(bluid);
+        llamarcompetencies(bluid);
     }
 
     bluSelector.addEventListener('change', function(event) {
         asignarBlu(event.target.value);
-        llamarresources(event.target.value);
+        llamarcompetencies(event.target.value);
     });
 
     document.querySelectorAll(".validate-selected").forEach((hiddenId) => {
@@ -23,11 +24,12 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
-    document.getElementById("resources").addEventListener('click', function(e) {
+    document.getElementById("competencies").addEventListener('click', function(e) {
         if (e.target.matches('button[data-action][data-from]')) {
             ejecutarEvento(e.target.dataset.action, e.target.dataset.from);
         }
     });
+
 });
 
 
@@ -50,7 +52,7 @@ function ejecutarEvento(action, from) {
     var value = document.getElementById(from).value;
 
     asignarBlu(bluid);
-    llamarresources(bluid, action, value);
+    llamarcompetencies(bluid, action, value);
 }
 
 function asignarBlu(bluid) {
@@ -59,13 +61,13 @@ function asignarBlu(bluid) {
     });
 }
 
-function llamarresources(bluid, action, value) {
+function llamarcompetencies(bluid, action, value) {
     var courseid = (new URLSearchParams(window.location.search)).get('courseid');
     if (!courseid) {
         return;
     }
 
-    var url = 'resources.php?courseid=' + courseid + '&id=' + bluid;
+    var url = 'competencies.php?courseid=' + courseid + '&bluid=' + bluid;
     if (action && value) {
         url += '&action=' + action + '&modid=' + value;
     }
@@ -75,9 +77,9 @@ function llamarresources(bluid, action, value) {
             return response.text();
         })
         .then(function(data) {
-            document.getElementById("resources").innerHTML = data;
+            document.getElementById("competencies").innerHTML = data;
         })
         .catch(function() {
-            console.log('Error fetching resources');
+            console.log('Error fetching');
         });
 }
