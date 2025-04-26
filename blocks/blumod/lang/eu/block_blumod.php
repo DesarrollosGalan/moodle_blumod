@@ -26,7 +26,6 @@ $string['subselectors'] = 'BLU honek hurrengo osagai hauek ditu';
 $string['availableresources'] = 'Baliabide eskuragarriak';
 $string['assignedresources'] = 'Baliabide esleituak';
 $string['reportblumod'] = 'Ikastaro batean dauden BLUei dagokien txostena';
-$string['blucompetencyid'] = 'Dagokion konpetentzia';
 $string['assigncompetencies'] = 'BLU eta konpetentzia lotzeko aukera';
 $string['availablecompetencies'] = 'Konpetentzia eskuragarriak';
 $string['assignedcompetencies'] = 'Konpetentzia esleituak';

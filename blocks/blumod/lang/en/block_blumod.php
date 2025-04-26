@@ -26,7 +26,6 @@ $string['subselectors'] = 'This BLU consists of ';
 $string['availableresources'] = 'Available Resources';
 $string['assignedresources'] = 'Assigned Resources';
 $string['reportblumod'] = 'In-course BLUs related report';
-$string['blucompetencyid'] = 'Related competency';
 $string['assigncompetencies'] = 'Assign competencies to BLUs';
 $string['availablecompetencies'] = 'Available Competencies';
 $string['assignedcompetencies'] = 'Assigned Competencies';
