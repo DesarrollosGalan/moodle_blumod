@@ -33,11 +33,11 @@ global $DB, $CFG, $PAGE;
 $courseid = required_param('courseid', PARAM_INT);
 
 $course = $DB->get_record('course', ['id'=>$courseid], '*', MUST_EXIST);
-$url = new moodle_url('/block/blumod/map.php', ['courseid'=>$courseid]);
+$url = new moodle_url('/block/blumod/assign_resources.php', ['courseid'=>$courseid]);
 $PAGE->set_url($url);
 require_login($course);
 
-$PAGE->requires->js('/blocks/blumod/map.js',true);
+$PAGE->requires->js('/blocks/blumod/assign_resources.js',true);
 
 $context = context_course::instance($course->id);
 $PAGE->set_context($context);
