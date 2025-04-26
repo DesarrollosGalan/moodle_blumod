@@ -82,7 +82,7 @@ function obtenerIdCurso(): int
 function borrarBlu(int $id): void
 {
     global $DB;
-    $DB->delete_records('block_blucompetency', ['competencyid' => $id, 'bluid' => $id]);
+    $DB->delete_records('block_blucompetency', ['bluid' => $id]);
     $DB->delete_records('block_blumod', ['blu' => $id]);
     $DB->delete_records('block_blupre', ['id_blu' => $id]);
     $DB->delete_records('block_blusub', ['id_blu' => $id]);
