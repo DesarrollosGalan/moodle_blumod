@@ -7,7 +7,7 @@ class reportcourse_selector {
     private $courseid;
 
     /** @var ?int */
-    private $bluid;
+    // private $bluid;
 
     /** @var array */
     private $resources = [];
@@ -15,11 +15,10 @@ class reportcourse_selector {
     private $name = 'reportcourseselector';
     private $rows = 10;    
 
-    public function __construct(int $courseid, ?int $bluid = null) {
+    public function __construct(int $courseid) {
         $this->courseid = $courseid;
-        $this->bluid = $bluid;
 
-        $this->loadResources();
+        // $this->loadresources();
     }
 
     public function display () {
@@ -49,43 +48,67 @@ class reportcourse_selector {
         $output .= html_writer::end_tag('div');
 
         return $output;
-
-
-        return $output;
     }
 
-    private function loadResources()
+    public function loadData()
     {
         global $DB;
         
+        /*
+        $sql = "SELECT blu.id AS bluid, 
+                       blu.description AS bluname, 
+                       blumod.id AS resourceid, 
+                       blumod.module AS resourcename, 
+                       0 AS resourcecompleted, 
+                       blucompetency.competencyid AS competencyid, 
+                       competency.shortname AS competencyshortname
+                FROM {block_blu} blu
+                LEFT JOIN {block_blumod} blumod ON blumod.blu = blu.id
+                LEFT JOIN {block_blucompetency} blucompetency ON blucompetency.bluid = blu.id
+                LEFT JOIN {competency} competency ON blucompetency.competencyid = competency.id
+                WHERE blu.course = :courseid
+                ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competencyid ASC";
+        */
+        $sql = "
+SELECT
+ blu.id AS bluid, 
+ blu.description AS bluname, 
+ blumod.id AS blumodid,
+ blumod.module AS blumodmodule,
+ cm.module AS cmmodule,
+ cm.instance AS cminstance, 
+ blucompetency.competencyid AS competencyid, 
+ competency.shortname AS competencyshortname,
+ modules.name AS modulename
+FROM {block_blumod} blumod
+LEFT JOIN {block_blu} blu ON blu.id = blumod.blu
+     JOIN {course_modules} cm ON cm.id = blumod.module
+LEFT JOIN {modules} modules ON modules.id = cm.module
+LEFT JOIN {block_blucompetency} blucompetency ON blucompetency.bluid = blu.id
+LEFT JOIN {competency} competency ON blucompetency.competencyid = competency.id
+WHERE blu.course = :courseid AND cm.deletioninprogress = :deletioninprogress
+ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competencyid ASC;
+        ";
         $params = ['courseid' => $this->courseid,'deletioninprogress' => '0'];
-        $sql = "SELECT cm.id, cm.instance, m.name module_name
-                     FROM {course_modules} cm
-                      LEFT  JOIN {modules} m 
-                        ON cm.module = m.id
-                     WHERE cm.deletioninprogress = :deletioninprogress
-                      AND cm.course = :courseid
-                     ORDER BY cm.section,cm.id ASC";
-        $modules = $DB->get_records_sql($sql, $params);
+        $results = $DB->get_recordset_sql($sql, $params);
 
-        foreach ($modules as $module) {            
-            $result = $DB->get_record($module->module_name,['id'=>$module->instance]);
-
-            $this->resources[$module->id] = $module->module_name . ': ' . $result->name;
+        $data = [];
+        foreach ($results as $result) {
+            $resource_name = $DB->get_record($result->modulename,['id'=>$result->cminstance]);
+            $resource_name_to_data = $result->modulename . ': ' . $resource_name->name;
+            $data[] = [
+                $result->bluid,
+                $result->bluname,
+                $result->blumodid,
+                $result->blumodmodule,
+                $result->cmmodule,
+                $result->cminstance,
+                $resource_name_to_data,
+                $result->competencyid,
+                $result->competencyshortname
+            ];
         }
-
-        $params = ['courseid' => $this->courseid];
-        $sql = "SELECT gi.id, gi.itemname, 'Calificador: '
-                     FROM {grade_items} gi
-                     WHERE gi.courseid = :courseid
-                      AND gi.itemtype = 'manual'
-                     ORDER BY gi.id ASC";
-        $gradeitems = $DB->get_records_sql($sql, $params);
-
-        foreach ($gradeitems as $gradeitem) {
-
-            $this->resources[$gradeitem->id] = 'Calificador manual: ' . $gradeitem->itemname;
-        }
+        return $data;
     }
 
     private function displaySelect(string $name, $data, bool $multiselect = true): string
@@ -111,7 +134,7 @@ class reportcourse_selector {
                       FROM {block_blumod} bm
                      WHERE bm.blu = :blu
                      ORDER BY bm.id ASC";
-        $params = ['blu' => $this->bluid];
+        $params = [];
         $blumods = $DB->get_records_sql($sql, $params);
         
         return $blumods;
