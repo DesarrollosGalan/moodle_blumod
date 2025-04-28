@@ -67,7 +67,7 @@ $pluginname = get_string('reportblumod', 'block_blumod');
 
 // $reporttable = report_blumod_get_table_name(); // Log table to use for fetaching records.
 
-$baseurl = new moodle_url('/block/blumod/reportcourse.php', array(
+$baseurl = new moodle_url('/blocks/blumod/reportcourse.php', array(
     'courseid' => $course->id
 ));
 $select = groups_allgroups_course_menu($course, $baseurl, true, $currentgroup);
