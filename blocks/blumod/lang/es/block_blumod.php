@@ -29,3 +29,4 @@ $string['reportblumod'] = 'Informe en el curso acerca de BLUs';
 $string['assigncompetencies'] = 'Asignar comptencias a BLUs';
 $string['availablecompetencies'] = 'Competencias disponibles';
 $string['assignedcompetencies'] = 'Competencias asignadas';
+$string['exportall'] = 'Exportar todo';

@@ -29,3 +29,4 @@ $string['reportblumod'] = 'Ikastaro batean dauden BLUei dagokien txostena';
 $string['assigncompetencies'] = 'BLU eta konpetentzia lotzeko aukera';
 $string['availablecompetencies'] = 'Konpetentzia eskuragarriak';
 $string['assignedcompetencies'] = 'Konpetentzia esleituak';
+$string['exportall'] = 'Esportartu data guztiak';

@@ -96,18 +96,20 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
         foreach ($results as $result) {
             $resource_name = $DB->get_record($result->modulename,['id'=>$result->cminstance]);
             $resource_name_to_data = $result->modulename . ': ' . $resource_name->name;
-            $data[] = [
-                $result->bluid,
-                $result->bluname,
-                $result->blumodid,
-                $result->blumodmodule,
-                $result->cmmodule,
-                $result->cminstance,
-                $resource_name_to_data,
-                $result->competencyid,
-                $result->competencyshortname
+            $data[] = (object) [
+                'bluid' => $result->bluid, 
+                'bluname' => $result->bluname , 
+                'blumodid' => $result->blumodid, 
+                'blumodmodule' => $result->blumodmodule, 
+                'cmmodule' => $result->cmmodule, 
+                'cminstance' => $result->cminstance, 
+                'resourcename' => $resource_name_to_data, 
+                'competencyid' => $result->competencyid, 
+                'competencyshortname' => $result->competencyshortname
             ];
         }
+
+        $results->close();
         return $data;
     }
 
