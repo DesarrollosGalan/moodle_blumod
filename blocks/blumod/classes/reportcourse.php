@@ -21,6 +21,7 @@ class reportcourse_selector {
         // $this->loadresources();
     }
 
+    /*
     public function display () {
         global $PAGE;
 
@@ -49,7 +50,7 @@ class reportcourse_selector {
 
         return $output;
     }
-
+    */
     public function loadData()
     {
         global $DB;
@@ -113,6 +114,7 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
         return $data;
     }
 
+    /*
     private function displaySelect(string $name, $data, bool $multiselect = true): string
     {
 
@@ -127,8 +129,9 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
 
         return $output;
     }
+    */
 
-
+    /*
     private function get_blumods() {
         global $DB;        
         $params = array();
@@ -141,5 +144,6 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
         
         return $blumods;
     }
+    */
 
 }
