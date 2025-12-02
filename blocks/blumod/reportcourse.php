@@ -25,7 +25,7 @@
 
  // use core\report_helper;
 
- xdebug_break();
+ // xdebug_break();
 
 require('../../config.php');
 require_once $CFG->dirroot.'/blocks/blumod/lib.php';
