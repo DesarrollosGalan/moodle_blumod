@@ -21,7 +21,6 @@ class reportcourse_selector {
         // $this->loadresources();
     }
 
-    /*
     public function display () {
         global $PAGE;
 
@@ -50,7 +49,7 @@ class reportcourse_selector {
 
         return $output;
     }
-    */
+
     public function loadData()
     {
         global $DB;
@@ -97,24 +96,21 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
         foreach ($results as $result) {
             $resource_name = $DB->get_record($result->modulename,['id'=>$result->cminstance]);
             $resource_name_to_data = $result->modulename . ': ' . $resource_name->name;
-            $data[] = (object) [
-                'bluid' => $result->bluid, 
-                'bluname' => $result->bluname , 
-                'blumodid' => $result->blumodid, 
-                'blumodmodule' => $result->blumodmodule, 
-                'cmmodule' => $result->cmmodule, 
-                'cminstance' => $result->cminstance, 
-                'resourcename' => $resource_name_to_data, 
-                'competencyid' => $result->competencyid, 
-                'competencyshortname' => $result->competencyshortname
+            $data[] = [
+                $result->bluid,
+                $result->bluname,
+                $result->blumodid,
+                $result->blumodmodule,
+                $result->cmmodule,
+                $result->cminstance,
+                $resource_name_to_data,
+                $result->competencyid,
+                $result->competencyshortname
             ];
         }
-
-        $results->close();
         return $data;
     }
 
-    /*
     private function displaySelect(string $name, $data, bool $multiselect = true): string
     {
 
@@ -129,9 +125,8 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
 
         return $output;
     }
-    */
 
-    /*
+
     private function get_blumods() {
         global $DB;        
         $params = array();
@@ -144,6 +139,5 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
         
         return $blumods;
     }
-    */
 
 }

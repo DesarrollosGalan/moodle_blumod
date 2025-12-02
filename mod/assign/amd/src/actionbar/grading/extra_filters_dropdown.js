@@ -15,7 +15,6 @@
 
 import {getDropdownDialog} from 'core/local/dropdown/dialog';
 import {getUserPreference} from 'core_user/repository';
-import $ from 'jquery';
 
 /**
  * Module for the extra filters dropdown on the submissions page.
@@ -65,7 +64,7 @@ const registerEventListeners = (extraFiltersDropdown) => {
     });
 
     // Event listener triggered upon hiding of the dropdown.
-    $(extraFiltersDropdown.getElement()).on('hide.bs.dropdown', () => {
+    extraFiltersDropdown.getElement().addEventListener('hide.bs.dropdown', () => {
         // Restore the filters to their stored preference values once the dropdown is closed.
         restoreAppliedWorkflowFilter(extraFiltersDropdown);
         restoreAppliedMarkerFilter(extraFiltersDropdown);
@@ -79,9 +78,10 @@ const registerEventListeners = (extraFiltersDropdown) => {
  * @param {DropdownDialog} extraFiltersDropdown The dropdown dialog instance.
  */
 const restoreAppliedWorkflowFilter = async(extraFiltersDropdown) => {
-    const appliedWorkflowFilter = await getUserPreference('assign_workflowfilter');
     const workflowFilterSelect = extraFiltersDropdown.getElement().querySelector(Selectors.workflowFilterElement);
-    workflowFilterSelect.value = appliedWorkflowFilter;
+    if (workflowFilterSelect) {
+        workflowFilterSelect.value = await getUserPreference('assign_workflowfilter');
+    }
 };
 
 /**
@@ -92,8 +92,7 @@ const restoreAppliedWorkflowFilter = async(extraFiltersDropdown) => {
 const restoreAppliedMarkerFilter = async(extraFiltersDropdown) => {
     const markerFilterSelect = extraFiltersDropdown.getElement().querySelector(Selectors.markerFilterElement);
     if (markerFilterSelect) {
-        const appliedMarkerFilter = await getUserPreference('assign_markerfilter');
-        markerFilterSelect.value = appliedMarkerFilter;
+        markerFilterSelect.value = await getUserPreference('assign_markerfilter');
     }
 };
 

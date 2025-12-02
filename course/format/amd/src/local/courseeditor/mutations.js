@@ -69,6 +69,8 @@ export default class {
     /**
      * Private method to call core_courseformat_create_module webservice.
      *
+     * @deprecated since Moodle 5.0 MDL-83469.
+     * @todo MDL-83851 This will be deleted in Moodle 6.0.
      * @method _callEditWebservice
      * @param {number} courseId
      * @param {string} modName module name
@@ -76,6 +78,7 @@ export default class {
      * @param {number} targetCmId optional target cm id
      */
     async _callAddModuleWebservice(courseId, modName, targetSectionNum, targetCmId) {
+        log.debug('_callAddModuleWebservice() is deprecated. Use _callNewModuleWebservice() instead');
         const args = {
             courseid: courseId,
             modname: modName,
@@ -184,6 +187,7 @@ export default class {
      * @param {int|null|undefined} data.targetSectionId the target section id
      * @param {int|null|undefined} data.targetCmId the target cm id
      * @param {String|null|undefined} data.component optional component (for format plugins)
+     * @param {Object|undefined} [data.feedbackParams] the params to build the feedback message
      * @return {Object} the log entry
      */
     async _getLoggerEntry(stateManager, action, itemIds, data = {}) {
@@ -192,7 +196,7 @@ export default class {
             stateManager.setLogger(new SRLogger());
             isLoggerSet = true;
         }
-        const feedbackParams = {
+        let feedbackParams = {
             action,
             itemType: data.itemType ?? action.split('_')[0],
         };
@@ -210,6 +214,9 @@ export default class {
         }
         if (data.targetCmId) {
             feedbackParams.targetCmName = stateManager.get('cm', data.targetCmId).name;
+        }
+        if (data.feedbackParams) {
+            feedbackParams = {...feedbackParams, ...data.feedbackParams};
         }
 
         const message = await getString(
@@ -359,28 +366,6 @@ export default class {
     }
 
     /**
-     * Move course modules to specific course location.
-     *
-     * @deprecated since Moodle 4.4 MDL-77038.
-     * @todo MDL-80116 This will be deleted in Moodle 4.8.
-     * @param {StateManager} stateManager the current state manager
-     * @param {array} sectionIds the list of section ids to move
-     * @param {number} targetSectionId the target section id
-     */
-    async sectionMove(stateManager, sectionIds, targetSectionId) {
-        log.debug('sectionMove() is deprecated. Use sectionMoveAfter() instead');
-        if (!targetSectionId) {
-            throw new Error(`Mutation sectionMove requires targetSectionId`);
-        }
-        const course = stateManager.get('course');
-        this.sectionLock(stateManager, sectionIds, true);
-        const updates = await this._callEditWebservice('section_move', course.id, sectionIds, targetSectionId);
-        this.bulkReset(stateManager);
-        stateManager.processUpdates(updates);
-        this.sectionLock(stateManager, sectionIds, false);
-    }
-
-    /**
      * Move course modules after a specific course location.
      *
      * @param {StateManager} stateManager the current state manager
@@ -412,6 +397,8 @@ export default class {
         const course = stateManager.get('course');
         const updates = await this._callEditWebservice('section_add', course.id, [], targetSectionId);
         stateManager.processUpdates(updates);
+        const logEntry = this._getLoggerEntry(stateManager, 'section_add', []);
+        stateManager.addLoggerEntry(await logEntry);
     }
 
     /**
@@ -422,9 +409,11 @@ export default class {
      */
     async sectionDelete(stateManager, sectionIds) {
         const course = stateManager.get('course');
+        const logEntry = this._getLoggerEntry(stateManager, 'section_delete', sectionIds);
         const updates = await this._callEditWebservice('section_delete', course.id, sectionIds);
         this.bulkReset(stateManager);
         stateManager.processUpdates(updates);
+        stateManager.addLoggerEntry(await logEntry);
     }
 
     /**
@@ -434,22 +423,27 @@ export default class {
      */
     async cmDelete(stateManager, cmIds) {
         const course = stateManager.get('course');
+        const logEntry = this._getLoggerEntry(stateManager, 'cm_delete', cmIds);
         this.cmLock(stateManager, cmIds, true);
         const updates = await this._callEditWebservice('cm_delete', course.id, cmIds);
         this.bulkReset(stateManager);
         this.cmLock(stateManager, cmIds, false);
         stateManager.processUpdates(updates);
+        stateManager.addLoggerEntry(await logEntry);
     }
 
     /**
      * Add a new module to a specific course section.
      *
+     * @deprecated since Moodle 5.0 MDL-83469.
+     * @todo MDL-83851 This will be deleted in Moodle 6.0.
      * @param {StateManager} stateManager the current state manager
      * @param {string} modName the modulename to add
      * @param {number} targetSectionNum the target section number
      * @param {number} targetCmId optional the target cm id
      */
     async addModule(stateManager, modName, targetSectionNum, targetCmId) {
+        log.debug('addModule() is deprecated. Use newModule() instead');
         if (!modName) {
             throw new Error(`Mutation addModule requires moduleName`);
         }
@@ -483,8 +477,18 @@ export default class {
             targetCmId = 0;
         }
         const course = stateManager.get('course');
+        const pluginname = await getString(
+            'pluginname',
+            `${modName.toLowerCase()}`,
+        );
+        const logEntry = this._getLoggerEntry(stateManager, 'cm_add', [], {
+            feedbackParams: {
+                'modname': pluginname,
+            },
+        });
         const updates = await this._callNewModuleWebservice(course.id, modName, targetSectionId, targetCmId);
         stateManager.processUpdates(updates);
+        stateManager.addLoggerEntry(await logEntry);
     }
 
     /**
@@ -518,8 +522,10 @@ export default class {
      * @param {array} cmIds the list of course modules ids
      * @param {bool} complete the new completion value
      */
-    cmCompletion(stateManager, cmIds, complete) {
+    async cmCompletion(stateManager, cmIds, complete) {
         const newState = (complete) ? 1 : 0;
+        const action = (newState == 1) ? 'cm_complete' : 'cm_uncomplete';
+        const logEntry = this._getLoggerEntry(stateManager, action, cmIds);
         stateManager.setReadOnly(false);
         cmIds.forEach((id) => {
             const element = stateManager.get('cm', id);
@@ -529,6 +535,7 @@ export default class {
             }
         });
         stateManager.setReadOnly(true);
+        stateManager.addLoggerEntry(await logEntry);
     }
 
     /**
@@ -635,9 +642,12 @@ export default class {
                 return;
             }
         }
+        const course = stateManager.get('course');
+        if (course.pageItem && course.pageItem.type === type && course.pageItem.id === id) {
+            return;
+        }
         stateManager.setReadOnly(false);
         // Remove the current page item.
-        const course = stateManager.get('course');
         course.pageItem = null;
         // Save the new page item.
         if (newPageItem) {

@@ -96,7 +96,7 @@ define('ENROL_ACTION_UNENROL', 'unenrol');
 /**
  * Returns instances of enrol plugins
  * @param bool $enabled return enabled only
- * @return array of enrol plugins name=>instance
+ * @return enrol_plugin[] array of enrol plugins name=>instance
  */
 function enrol_get_plugins($enabled) {
     global $CFG;
@@ -809,7 +809,7 @@ function enrol_get_my_courses($fields = null, $sort = null, $limit = 0, $coursei
         }
     }
 
-    // Note: we can not use DISTINCT + text fields due to Oracle and MS limitations, that is why
+    // Note: we can not use DISTINCT + text fields due to MS limitations, that is why
     // we have the subselect there.
     $sql = "SELECT $coursefields $ccselect $timeaccessselect
               FROM {course} c
@@ -1111,8 +1111,7 @@ function enrol_get_all_users_courses($userid, $onlyactive = false, $fields = nul
 
     if ($onlyactive) {
         $subwhere = "WHERE ue.status = :active AND e.status = :enabled AND ue.timestart < :now1 AND (ue.timeend = 0 OR ue.timeend > :now2)";
-        $params['now1']    = round(time(), -2); // improves db caching
-        $params['now2']    = $params['now1'];
+        $params['now1']    = $params['now2'] = \core\di::get(\core\clock::class)->time();
         $params['active']  = ENROL_USER_ACTIVE;
         $params['enabled'] = ENROL_INSTANCE_ENABLED;
     } else {
@@ -1124,7 +1123,7 @@ function enrol_get_all_users_courses($userid, $onlyactive = false, $fields = nul
     $ccjoin = "LEFT JOIN {context} ctx ON (ctx.instanceid = c.id AND ctx.contextlevel = :contextlevel)";
     $params['contextlevel'] = CONTEXT_COURSE;
 
-    //note: we can not use DISTINCT + text fields due to Oracle and MS limitations, that is why we have the subselect there
+    //note: we can not use DISTINCT + text fields due to MS limitations, that is why we have the subselect there
     $sql = "SELECT $coursefields $ccselect
               FROM {course} c
               JOIN (SELECT DISTINCT e.courseid
@@ -1895,7 +1894,7 @@ abstract class enrol_plugin {
     /**
      * Returns localised name of enrol instance
      *
-     * @param object $instance (null is accepted too)
+     * @param stdClass|null $instance (null is accepted too)
      * @return string
      */
     public function get_instance_name($instance) {
@@ -1906,6 +1905,18 @@ abstract class enrol_plugin {
             $context = context_course::instance($instance->courseid);
             return format_string($instance->name, true, array('context'=>$context));
         }
+    }
+
+    /**
+     * How this enrolment method should be displayed on the "Enrolment methods" page
+     *
+     * Some plugins may choose to add more information, for example, user role, dates, etc.
+     *
+     * @param stdClass $instance
+     * @return string
+     */
+    public function get_instance_name_for_management_page(stdClass $instance): string {
+        return (string)$this->get_instance_name($instance);
     }
 
     /**
@@ -2436,14 +2447,6 @@ abstract class enrol_plugin {
     }
 
     /**
-     * @deprecated since Moodle 2.8 MDL-35864 - please use can_delete_instance() instead.
-     */
-    public function instance_deleteable($instance) {
-        throw new coding_exception('Function enrol_plugin::instance_deleteable() is deprecated, use
-                enrol_plugin::can_delete_instance() instead');
-    }
-
-    /**
      * Is it possible to delete enrol instance via standard UI?
      *
      * @param stdClass  $instance
@@ -2728,25 +2731,11 @@ abstract class enrol_plugin {
     }
 
     /**
-     * Update instance members.
-     *
-     * Update communication room membership for an instance action being performed.
-     *
-     * @param int $enrolmentinstanceid ID of the enrolment instance
-     * @param string $action The update action being performed
-     * @param stdClass $course The course object
-     * @return void
      * @deprecated Since Moodle 4.4.0.
-     * @see \core_communication\hook_listener::update_communication_memberships_for_enrol_status_change()
-     * @todo MDL-80491 Final deprecation in Moodle 4.8.
-     *
      */
-    public function update_communication(int $enrolmentinstanceid, string $action, stdClass $course): void {
-        debugging('Use of method update_communication is deprecated. This feature has been moved to
-        core_communication as a part of hooks api implementation so that plugins or core does not need to call this method anymore.
-        Method update_communication_memberships_for_enrol_status_change method in communication/classes/hook_listener.php
-        now handles all the operations related to this method using hooks callback recorded in lib/db/hooks.php.', DEBUG_DEVELOPER);
-        return;
+    #[\core\attribute\deprecated(null, reason: 'Replaced with hooks', since: '4.4', mdl: 'MDL-78551', final: true)]
+    public function update_communication(): void {
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -2795,11 +2784,15 @@ abstract class enrol_plugin {
     }
 
     /**
-     * Creates course enrol form, checks if form submitted
-     * and enrols user if necessary. It can also redirect.
+     * Creates a widget to display on the course enrolment page. It can also redirect.
+     *
+     * It is recommended that all plugins use the same template for the consistent output. Example:
+     *
+     *     $obj = new \core_enrol\output\enrol_page($instance, ...);
+     *     return $OUTPUT->render($obj);
      *
      * @param stdClass $instance
-     * @return string html text, usually a form in a text box
+     * @return string|null html to display on the enrolment page
      */
     public function enrol_page_hook(stdClass $instance) {
         return null;
@@ -3655,7 +3648,9 @@ abstract class enrol_plugin {
         ?string $message = '',
         ?int $roleid = null,
     ): void {
-        global $DB;
+        global $DB, $CFG;
+        require_once($CFG->dirroot . '/course/lib.php');
+
         $context = context_course::instance($instance->courseid);
         $user = core_user::get_user($userid);
         $course = get_course($instance->courseid);
@@ -3666,6 +3661,7 @@ abstract class enrol_plugin {
 
         $a = new stdClass();
         $a->coursename = format_string($course->fullname, true, ['context' => $context, 'escape' => false]);
+        $a->courselink = course_get_url($course)->out();
         $a->profileurl = (new moodle_url(
             url: '/user/view.php',
             params: [
@@ -3682,6 +3678,7 @@ abstract class enrol_plugin {
         if ($message && trim($message) !== '') {
             $placeholders = [
                 '{$a->coursename}',
+                '{$a->courselink}',
                 '{$a->profileurl}',
                 '{$a->fullname}',
                 '{$a->email}',
@@ -3691,6 +3688,7 @@ abstract class enrol_plugin {
             ];
             $values = [
                 $a->coursename,
+                $a->courselink,
                 $a->profileurl,
                 fullname($user),
                 $user->email,
@@ -3735,7 +3733,7 @@ abstract class enrol_plugin {
         $message->fullmessagehtml = $messagehtml;
         $message->notification = 1;
         $message->contexturl = $a->profileurl;
-        $message->contexturlname = $course->fullname;
+        $message->contexturlname = $a->coursename;
 
         message_send($message);
     }

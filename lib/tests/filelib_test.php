@@ -511,6 +511,27 @@ final class filelib_test extends \advanced_testcase {
         $this->assertNotEquals(0, $curl->get_errno());
         $this->assertNotEquals('47250a973d1b88d9445f94db4ef2c97a', md5($contents));
 
+        // Test multiple queries with proxy.
+        $curl = new \curl(['debug' => 1]);
+        ob_start();
+        $requests = [[
+            'nobody' => true,
+            'header' => 1,
+            'url' => $testurl,
+            'returntransfer' => true,
+        ],
+        [
+            'nobody' => true,
+            'header' => 1,
+            'url' => $testurl,
+            'returntransfer' => true,
+        ]];
+        $curl->download($requests);
+        $output = ob_get_contents();
+        ob_end_clean();
+        // We must have exactly 2 occurrences of ["CURLOPT_PROXY"].
+        $this->assertMatchesRegularExpression('/(\["CURLOPT_PROXY"\].*){2}/ms', $output);
+
         // Test with proxy bypass.
         $testurlhost = parse_url($testurl, PHP_URL_HOST);
         $CFG->proxybypass = $testurlhost;
@@ -518,6 +539,26 @@ final class filelib_test extends \advanced_testcase {
         $contents = $curl->get($testurl);
         $this->assertSame(0, $curl->get_errno());
         $this->assertSame('47250a973d1b88d9445f94db4ef2c97a', md5($contents));
+
+        // Test multiple queries with proxy bypass.
+        $curl = new \curl(['debug' => 1]);
+        ob_start();
+        $requests = [[
+            'nobody' => true,
+            'header' => 1,
+            'url' => $testurl,
+            'returntransfer' => true,
+        ],
+        [
+            'nobody' => true,
+            'header' => 1,
+            'url' => $testurl,
+            'returntransfer' => true,
+        ]];
+        $curl->download($requests);
+        $output = ob_get_contents();
+        ob_end_clean();
+        $this->assertStringNotContainsString('["CURLOPT_PROXY"]', $output);
 
         $CFG->proxyhost = $oldproxy;
         $CFG->proxybypass = $oldproxybypass;
@@ -2075,6 +2116,56 @@ EOF;
                 'text/html',
             ],
         ];
+    }
+
+    /**
+     * Tests that readfile_accel() triggers the expected debugging message when a non-empty
+     * output buffer is detected, using both a file path and a stored_file input.
+     *
+     * This test runs a CLI script in a separate process to isolate buffer manipulation.
+     * This is necessary because readfile_accel() uses ob_get_clean() and ob_end_flush(),
+     * which interfere with PHPUnit's internal output buffer enforcement and cause risky
+     * test errors.
+     *
+     * The CLI script simulates a non-empty output buffer, calls the readfile_accel(), and
+     * prints any debugging output. The test then captures that output and asserts that the
+     * correct debugging message was generated.
+     *
+     * @covers ::readfile_accel
+     */
+    public function test_readfile_accel_with_path_and_stored_file(): void {
+        $this->resetAfterTest();
+
+        // Construct the command to run the CLI script with a custom constant defined.
+        $scriptpath = __DIR__ . '/fixtures/readfile_accel_debug_cli.php';
+        $cmd = 'php -r ' . escapeshellarg("define('PHPUNIT_READFILE_ACCEL_TEST', true); require '$scriptpath';");
+
+        $pipes = [];
+        $process = proc_open($cmd, [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes);
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $exitcode = proc_close($process);
+
+        $output = $stdout . $stderr;
+
+        // Debug just in case the subprocess fails.
+        $this->assertSame(0, $exitcode);
+
+        // Validate that both path-based and stored_file debugging messages are present.
+        $filename = "readfile_accel.txt";
+        $filepath = '/tmp/' . $filename;
+        $this->assertStringContainsString('Non-empty default output handler buffer detected while serving the file ' .
+            $filepath . '. Buffer contents (first 20 characters): test text', $output);
+        $this->assertStringContainsString('Non-empty default output handler buffer detected while serving the file ' .
+            $filename . '. Buffer contents (first 20 characters): test text', $output);
     }
 }
 

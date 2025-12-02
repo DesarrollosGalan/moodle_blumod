@@ -73,15 +73,18 @@ $string['assignmentduedigesthtml'] = '<p>Hi {$a->firstname},</p>
 $string['assignmentduedigestitem'] = '<strong>{$a->assignmentname}</strong> in course {$a->coursename}<br/>
 <strong>Due: {$a->duetime}</strong><br/>
 <a href="{$a->url}" aria-label="Go to {$a->assignmentname}">Go to activity</a>';
+$string['assignmentduedigestsms'] = 'One or more assignments are due in 7 days. Log in to view upcoming assignments.';
 $string['assignmentduedigestsubject'] = 'You have assignments due in 7 days';
 $string['assignmentduesoonhtml'] = '<p>Hi {$a->firstname},</p>
 <p>The assignment <strong>{$a->assignmentname}</strong> in course {$a->coursename} is due soon.</p>
 <p><strong>Due: {$a->duedate}</strong></p>
 <p><a href="{$a->url}">Go to activity</a></p>';
+$string['assignmentduesoonsms'] = 'Your assignment {$a->assignmentname} is due on {$a->duedate}: {$a->url}';
 $string['assignmentoverduehtml'] = '<p>Hi {$a->firstname},</p>
 <p><strong>{$a->assignmentname}</strong> in course {$a->coursename} was due on <strong>{$a->duedate}</strong>.</p>
 <p>You might still be able to submit your assignment{$a->cutoffsnippet}, but your submission will be marked as late.</p>
 <p><a href="{$a->url}">Go to activity</a></p>';
+$string['assignmentoverduesms'] = 'Your assignment {$a->assignmentname} is overdue on {$a->duedate}: {$a->url}';
 $string['assignmentoverduehtmlcutoffsnippet'] = ' <strong>by {$a->cutoffdate}</strong>';
 $string['assignmentduesoonsubject'] = 'Due on {$a->duedate}: {$a->assignmentname}';
 $string['assignmentoverduesubject'] = 'Overdue: {$a->assignmentname}';
@@ -92,8 +95,7 @@ assignment submission for \'{$a->assignment}\'
 You can see it appended to your assignment submission:
 
     {$a->url}';
-$string['assignmentmailhtml'] = '<p>{$a->grader} has posted some feedback on your
-assignment submission for \'<i>{$a->assignment}</i>\'.</p>
+$string['assignmentmailhtml'] = '<p>{$a->grader} has posted some feedback on your assignment submission for \'{$a->assignment}\'.</p>
 <p>You can see it appended to your <a href="{$a->url}">assignment submission</a>.</p>';
 $string['assignmentmailsmall'] = '{$a->grader} has posted some feedback on your
 assignment submission for \'{$a->assignment}\' You can see it appended to your submission';
@@ -109,16 +111,16 @@ $string['attemptnumber'] = 'Attempt number';
 $string['attemptsettings'] = 'Attempt settings';
 $string['attemptreopenmethod'] = 'Grant attempts';
 $string['attemptreopenmethod_automatic'] = 'Automatically';
-$string['attemptreopenmethod_automatic_help'] = 'After each attempt, the next is granted automatically.';
-$string['attemptreopenmethod_help'] = 'This setting controls how students are granted attempts for this assignment. For each attempt, the grade and feedback are saved, and can be viewed by the teacher and the student. The available options are:
+$string['attemptreopenmethod_automatic_help'] = 'After each attempt, the next is granted automatically after grading.';
+$string['attemptreopenmethod_help'] = 'This setting controls how students are granted attempts for this assignment. For each attempt, the grade and feedback are saved, and can be viewed by the teacher and the student. Options are:
 
 * Manually - After each attempt, you can grant the next one through the Submissions page or the Grader page.
-* Automatically - After each attempt, the next is granted automatically.
-* Automatically until pass - After each attempt, the next will be granted automatically, until the student achieves the passing grade.';
+* Automatically - After each attempt, the next is granted automatically after grading.
+* Automatically until pass - After each attempt, the next will be granted automatically after grading, until the student achieves the passing grade.';
 $string['attemptreopenmethod_manual'] = 'Manually';
 $string['attemptreopenmethod_manual_help'] = 'After each attempt, you can grant the next one through the Submissions page or the Grader page.';
 $string['attemptreopenmethod_untilpass'] = 'Automatically until pass';
-$string['attemptreopenmethod_untilpass_help'] = 'After each attempt, the next will be granted automatically, until the student achieves the passing grade.';
+$string['attemptreopenmethod_untilpass_help'] = 'After each attempt, the next will be granted automatically after grading, until the student achieves the passing grade.';
 $string['availability'] = 'Availability';
 $string['back'] = 'Back';
 $string['backtoassignment'] = 'Back to assignment';
@@ -145,8 +147,10 @@ $string['batchsetallocatedmarker'] = 'Set allocated marker for {$a} selected use
 $string['batchsetmarkingworkflowstateforusers'] = 'Set marking workflow state for {$a} selected user(s).';
 $string['beginassignment'] = 'Begin assignment';
 $string['blindmarking'] = 'Anonymous submissions';
-$string['blindmarkingenabledwarning'] = 'Anonymous submissions are enabled for this activity. Grades will not be added to the gradebook until student identities are revealed via the "Actions" menu.';
+$string['blindmarkingenabledwarning'] = 'Anonymous submissions are enabled for this activity.';
+$string['blindmarkingnogradewarning'] = 'Anonymous submissions are enabled for this activity. Grades will not be added to the gradebook until student identities are revealed via the "Actions" menu.';
 $string['blindmarking_help'] = 'Anonymous submissions hide the identity of students from markers. Anonymous submission settings will be locked once a submission or grade has been made in relation to this assignment.';
+$string['bulkactionsselection'] = 'Bulk actions selection';
 $string['cachedef_overrides'] = 'User and group override information';
 $string['calendardue'] = '{$a} is due';
 $string['calendarextension'] = '{$a} is due (extension)';
@@ -218,6 +222,7 @@ $string['editingstatus'] = 'Editing status';
 $string['enabled'] = 'Enabled';
 $string['enabletimelimit'] = 'Enable timed assignments';
 $string['enabletimelimit_help'] = 'If enabled, you can set a time limit on assignment settings page.';
+$string['errorgradechangessaveddetail'] = 'The changes to the grade and feedback were not saved.';
 $string['eventallsubmissionsdownloaded'] = 'All the submissions are being downloaded.';
 $string['eventassessablesubmitted'] = 'A submission has been submitted.';
 $string['eventbatchsetmarkerallocationviewed'] = 'Batch set marker allocation viewed';
@@ -268,10 +273,9 @@ for \'{$a->assignment}\' at {$a->timeupdated}
 It is available here:
 
     {$a->url}';
-$string['gradersubmissionupdatedhtml'] = '{$a->username} has updated their assignment submission
-for <i>\'{$a->assignment}\'  at {$a->timeupdated}</i><br /><br />
-It is <a href="{$a->url}">available on the web site</a>.';
+$string['gradersubmissionupdatedhtml'] = '{$a->username} has updated their assignment submission for \'{$a->assignment}\' at {$a->timeupdated}. It is available in <a href="{$a->url}">assignment submissions</a>.';
 $string['gradersubmissionupdatedsmall'] = '{$a->username} has updated their submission for assignment {$a->assignment}.';
+$string['gradersubmissionupdatedsms'] = '{$a->username} updated their submission for assignment \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view';
 $string['gradeuser'] = 'Grade {$a}';
 $string['grantextension'] = 'Grant extension';
 $string['grantextensionforusers'] = 'Grant extension for {$a} students';
@@ -286,8 +290,7 @@ assignment submission for \'{$a->assignment}\'
 You can see it appended to your assignment submission:
 
     {$a->url}';
-$string['feedbackavailablehtml'] = '{$a->username} has posted some feedback on your
-assignment submission for \'<i>{$a->assignment}</i>\'<br /><br />
+$string['feedbackavailablehtml'] = '{$a->username} has posted some feedback on your assignment submission for \'{$a->assignment}\'.
 You can see it appended to your <a href="{$a->url}">assignment submission</a>.';
 $string['feedbackavailablesmall'] = '{$a->username} has given feedback for assignment {$a->assignment}';
 $string['feedbackavailableanontext'] = 'You have new feedback on your
@@ -296,10 +299,10 @@ assignment submission for \'{$a->assignment}\'
 You can see it appended to your assignment submission:
 
     {$a->url}';
-$string['feedbackavailableanonhtml'] = 'You have new feedback on your
-assignment submission for \'<i>{$a->assignment}</i>\'<br /><br />
-You can see it appended to your <a href="{$a->url}">assignment submission</a>.';
+$string['feedbackavailableanonhtml'] = 'You have new feedback on your assignment submission for \'{$a->assignment}\'. You can see it appended to your <a href="{$a->url}">assignment submission</a>.';
 $string['feedbackavailableanonsmall'] = 'New feedback for assignment {$a->assignment}';
+$string['feedbackavailableanonsms'] = 'New feedback on \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view';
+$string['feedbackavailablesms'] = 'New feedback on \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view';
 $string['feedbackplugins'] = 'Feedback plugins';
 $string['feedbackpluginforgradebook'] = 'Feedback plugin that will push comments to the gradebook';
 $string['feedbackpluginforgradebook_help'] = 'Only one assignment feedback plugin can push feedback into the gradebook.';
@@ -310,6 +313,7 @@ $string['filesubmissions'] = 'File submissions';
 $string['filter'] = 'Filter';
 $string['filterall'] = 'All';
 $string['filterdraft'] = 'Draft';
+$string['filtergraded'] = 'Graded';
 $string['filtergrantedextension'] = 'Granted extension';
 $string['filternone'] = 'No filter';
 $string['filternotsubmitted'] = 'Not submitted';
@@ -326,6 +330,8 @@ $string['gradelocked'] = 'This grade is locked or overridden in the gradebook.';
 $string['gradeoutof'] = 'Grade out of {$a}';
 $string['gradeoutofhelp'] = 'Grade';
 $string['gradeoutofhelp_help'] = 'Enter the grade for the student\'s submission here. You may include decimals.';
+$string['gradepenalty'] = 'Grade penalties';
+$string['gradepenalty_help'] = 'If enabled, penalties will be applied to assignments submitted after the due date.';
 $string['gradestudent'] = 'Grade student: (id={$a->id}, fullname={$a->fullname}). ';
 $string['grading'] = 'Grading';
 $string['gradingchangessaved'] = 'The grade changes were saved';
@@ -461,6 +467,7 @@ $string['overridedeletegroupsure'] = 'Are you sure you want to delete the overri
 $string['overridedeleteusersure'] = 'Are you sure you want to delete the override for user {$a}?';
 $string['overridegroup'] = 'Override group';
 $string['overridegroupeventname'] = '{$a->assign} - {$a->group}';
+$string['overriderecalculatepenalty'] = 'Recalculate penalty for user(s) in the override';
 $string['overrides'] = 'Overrides';
 $string['overrideuser'] = 'Override user';
 $string['overrideusereventname'] = '{$a->assign} - Override';
@@ -469,6 +476,7 @@ $string['page-mod-assign-x'] = 'Any assignment module page';
 $string['page-mod-assign-view'] = 'Assignment module main and submission page';
 $string['paramtimeremaining'] = '{$a} remaining';
 $string['participant'] = 'Participant';
+$string['penaltyduedatechangemessage'] = 'Some grades have already been awarded. In order to change the due date, disable/enable penalty, you must first choose whether or not to recalculate existing grades.';
 $string['pluginadministration'] = 'Assignment administration';
 $string['pluginname'] = 'Assignment';
 $string['preventsubmissionnotingroup'] = 'Require group to make submission';
@@ -570,16 +578,16 @@ $string['submissionactions'] = 'Submission actions';
 $string['submissionattachments'] = 'Only show files during submission';
 $string['submissionattachments_help'] = 'Tick the box to only show files on the submission page. Otherwise, files will be shown on both the assignment and submission pages.';
 $string['confirmstart'] = 'You have {$a} to complete this assignment. When you begin, the timer will start to count down and can\'t be paused.';
-$string['submissioncopiedtext'] = 'You have made a copy of your previous
-assignment submission for \'{$a->assignment}\'
+$string['submissioncontains'] = 'Your submission contains:';
+$string['submissioncopiedtext'] = 'You have made a copy of your previous assignment submission for \'{$a->assignment}\'
 
 You can see the status of your assignment submission:
 
     {$a->url}';
-$string['submissioncopiedhtml'] = '<p>You have made a copy of your previous
-assignment submission for \'<i>{$a->assignment}</i>\'.</p>
+$string['submissioncopiedhtml'] = '<p>You have made a copy of your previous assignment submission for \'{$a->assignment}\'.</p>
 <p>You can see the status of your <a href="{$a->url}">assignment submission</a>.</p>';
 $string['submissioncopiedsmall'] = 'You have copied your previous assignment submission for {$a->assignment}';
+$string['submissioncopiedsms'] = 'You have made a copy of your previous submission for \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view';
 $string['submissiondrafts'] = 'Require students to click the submit button';
 $string['submissiondrafts_help'] = 'Should students have a submit button to indicate when they have finished making changes to their submission and it is ready for grading?';
 $string['submissioneditable'] = 'Student can edit this submission';
@@ -590,26 +598,29 @@ $string['submissionnotopen'] = 'This assignment is not open for submissions';
 $string['submissionnotready'] = 'This assignment is not ready to submit:';
 $string['privacy:submissionpath'] = 'submission';
 $string['submissionplugins'] = 'Submission plugins';
-$string['submissionreceipts'] = 'Send submission receipts';
-$string['submissionreceiptothertext'] = 'Your assignment submission for
-\'{$a->assignment}\' has been submitted.
+$string['submissionreceiptcontains'] = 'Submitted content ({$a->total} items):';
+$string['submissionreceipthtml'] = '<p>Your assignment submission for \'{$a->assignment}\' has been submitted.</p>
+<p>You can view your submission and check its status on the <a href="{$a->url}">assignment page</a>.</p>
+{$a->submissionsummaryhtml}';
+$string['submissionreceiptothertext'] = 'Your assignment submission for \'{$a->assignment}\' has been submitted.
 
 You can see the status of your assignment submission:
 
     {$a->url}';
-$string['submissionreceiptotherhtml'] = 'Your assignment submission for
-\'<i>{$a->assignment}</i>\' has been submitted.<br /><br />
-You can see the status of your <a href="{$a->url}">assignment submission</a>.';
+$string['submissionreceiptotherhtml'] = 'Your assignment submission for \'{$a->assignment}\' has been submitted. You can see the status of your <a href="{$a->url}">assignment submission</a>.';
 $string['submissionreceiptothersmall'] = 'Your assignment submission for {$a->assignment} has been submitted.';
-$string['submissionreceipttext'] = 'You have submitted an
-assignment submission for \'{$a->assignment}\'
+$string['submissionreceiptothersms'] = 'Submission made for \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view your submission status';
+$string['submissionreceipts'] = 'Send submission receipts';
+$string['submissionreceiptsmall'] = 'Assignment submission confirmation - {$a->assignment}';
+$string['submissionreceiptsms'] = 'You have submitted \'{$a->assignment}\' in \'{$a->coursefullname}\'. Log in to view the submission status';
+$string['submissionreceipttext'] = 'You have submitted an assignment submission for \'{$a->assignment}\'.
 
 You can see the status of your assignment submission:
 
-    {$a->url}';
-$string['submissionreceipthtml'] = '<p>You have submitted an assignment submission for \'<i>{$a->assignment}</i>\'.</p>
-<p>You can see the status of your <a href="{$a->url}">assignment submission</a>.</p>';
-$string['submissionreceiptsmall'] = 'You have submitted your assignment submission for {$a->assignment}';
+    {$a->url}
+
+{$a->submissionsummarytext}';
+$string['submissions'] = 'Submissions';
 $string['submissionslocked'] = 'This assignment is not accepting submissions';
 $string['submissionslockedshort'] = 'Submission changes not allowed';
 $string['submissionsclosed'] = 'Submissions closed';
@@ -652,9 +663,9 @@ $string['subplugintype_assignsubmission'] = 'Submission plugin';
 $string['subplugintype_assignsubmission_plural'] = 'Submission plugins';
 $string['subplugintype_assignfeedback'] = 'Feedback plugin';
 $string['subplugintype_assignfeedback_plural'] = 'Feedback plugins';
-$string['teamname'] = 'Team: {$a}';
+$string['teamname'] = 'Group: {$a}';
 $string['teamsubmission'] = 'Students submit in groups';
-$string['teamsubmission_help'] = 'If enabled, students will be divided into groups based on the default set of groups or a custom grouping. A group submission will be shared among group members and all members of the group will see each others\' changes to the submission.';
+$string['teamsubmission_help'] = 'If enabled, students will be divided into groups based on the default set of groups or a custom grouping. A group submission will be shared among group members and all members of the group will see each others\' changes to the submission. Note: You cannot change this setting if there are submissions already.';
 $string['teamsubmissiongroupingid'] = 'Grouping for student groups';
 $string['teamsubmissiongroupingid_help'] = 'This is the grouping that the assignment will use to find groups for student groups. If not set, the default set of groups will be used.';
 $string['textinstructions'] = 'Assignment instructions';

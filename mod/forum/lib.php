@@ -371,6 +371,8 @@ function forum_supports($feature) {
         case FEATURE_PLAGIARISM:              return true;
         case FEATURE_ADVANCED_GRADING:        return true;
         case FEATURE_MOD_PURPOSE:             return MOD_PURPOSE_COLLABORATION;
+        case FEATURE_CAN_UNINSTALL:
+            return false;
 
         default: return null;
     }
@@ -526,13 +528,6 @@ function forum_user_complete($course, $user, $mod, $forum) {
 }
 
 /**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function forum_filter_user_groups_discussions() {
-    throw new coding_exception('forum_filter_user_groups_discussions() can not be used any more and is obsolete.');
-}
-
-/**
  * Returns whether the discussion group is visible by the current user or not.
  *
  * @since Moodle 2.8, 2.7.1, 2.6.4
@@ -556,13 +551,6 @@ function forum_is_user_group_discussion(cm_info $cm, $discussiongroupid) {
     }
 
     return false;
-}
-
-/**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function forum_print_overview() {
-    throw new coding_exception('forum_print_overview() can not be used any more and is obsolete.');
 }
 
 /**
@@ -2148,7 +2136,7 @@ function forum_get_course_forum($courseid, $type) {
         echo $OUTPUT->notification("Could not add a new course module to the course '" . $courseid . "'");
         return false;
     }
-    $sectionid = course_add_cm_to_section($courseid, $mod->coursemodule, 0);
+    $sectionid = course_add_cm_to_section($courseid, $mod->coursemodule, 0, null, 'forum');
     return $DB->get_record("forum", array("id" => "$forum->id"));
 }
 
@@ -4047,7 +4035,7 @@ function forum_print_recent_mod_activity($activity, $courseid, $detail, $modname
         'border' => '0',
         'cellpadding' => '3',
         'cellspacing' => '0',
-        'class' => 'forum-recent'
+        'class' => 'forum-recent table-reboot',
     ];
     $output = html_writer::start_tag('table', $tableoptions);
     $output .= html_writer::start_tag('tr');
@@ -5044,7 +5032,7 @@ function forum_reset_gradebook($courseid, $type='') {
  *
  * @global object
  * @global object
- * @param $data the data submitted from the reset course.
+ * @param stdClass $data the data submitted from the reset course.
  * @return array status array
  */
 function forum_reset_userdata($data) {
@@ -5247,7 +5235,13 @@ function forum_reset_userdata($data) {
     if ($data->timeshift) {
         // Any changes to the list of dates that needs to be rolled should be same during course restore and course reset.
         // See MDL-9367.
-        shift_course_mod_dates('forum', ['assesstimestart', 'assesstimefinish'], $data->timeshift, $data->courseid);
+        shift_course_mod_dates('forum', [
+            'assesstimestart',
+            'assesstimefinish',
+            'duedate',
+            'cutoffdate',
+        ], $data->timeshift, $data->courseid);
+
         $status[] = [
             'component' => $componentstr,
             'item' => get_string('date'),
@@ -5930,7 +5924,7 @@ function forum_get_posts_by_user($user, array $courses, $musthaveaccess = false,
 
     // Prepare SQL to both count and search.
     // We alias user.id to useridx because we forum_posts already has a userid field and not aliasing this would break
-    // oracle and mssql.
+    // mssql.
     $userfieldsapi = \core_user\fields::for_userpic();
     $userfields = $userfieldsapi->get_sql('u', false, '', 'useridx', false)->selects;
     $countsql = 'SELECT COUNT(*) ';

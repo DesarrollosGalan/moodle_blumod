@@ -16,15 +16,16 @@ Feature: Teachers can override the grade for any question
       | user     | course | role           |
       | teacher1 | C1     | editingteacher |
       | student1 | C1     | student        |
+    And the following "activities" exist:
+      | activity   | name    | intro              | course | idnumber | grade |
+      | quiz       | Quiz 1  | Quiz 1 description | C1     | quiz1    | 20    |
     And the following "question categories" exist:
-      | contextlevel | reference | name           |
-      | Course       | C1        | Test questions |
+      | contextlevel    | reference | name           |
+      | Activity module | quiz1     | Test questions |
     And the following "questions" exist:
       | questioncategory | qtype       | name  | questiontext    | defaultmark |
       | Test questions   | essay       | TF1   | First question  | 20          |
-    And the following "activities" exist:
-      | activity   | name   | intro              | course | idnumber | grade |
-      | quiz       | Quiz 1 | Quiz 1 description | C1     | quiz1    | 20    |
+
     And quiz "Quiz 1" contains the following questions:
       | question | page |
       | TF1      | 1    |
@@ -62,6 +63,7 @@ Feature: Teachers can override the grade for any question
     And I am on the "Quiz 1 > student1 > Attempt 1" "mod_quiz > Attempt review" page
     And I follow "Make comment or override mark"
     And I switch to "commentquestion" window
+    And "Summary of attempt" "table" should exist
     And I set the field "Comment" to "Administrator's comment"
     And I select the "p" element in position "0" of the "Comment" TinyMCE editor
     And I click on the "Image" button for the "Comment" TinyMCE editor

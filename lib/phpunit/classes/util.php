@@ -205,6 +205,7 @@ class phpunit_util extends testing_util {
         // reinitialise following globals
         $OUTPUT = new bootstrap_renderer();
         $PAGE = new moodle_page();
+        \navigation_node::reset_all_data();
         $FULLME = null;
         $ME = null;
         $SCRIPT = null;
@@ -273,6 +274,9 @@ class phpunit_util extends testing_util {
         if (class_exists('\core_group\customfield\grouping_handler')) {
             \core_group\customfield\grouping_handler::reset_caches();
         }
+        if (class_exists('\core_reportbuilder\customfield\report_handler')) {
+            \core_reportbuilder\customfield\report_handler::reset_caches();
+        }
 
         // Clear static cache within restore.
         if (class_exists('restore_section_structure_step')) {
@@ -314,7 +318,7 @@ class phpunit_util extends testing_util {
 
         if ($warnings) {
             $warnings = implode("\n", $warnings);
-            trigger_error($warnings, E_USER_WARNING);
+            throw new \core_phpunit\exception\test_exception($warnings);
         }
     }
 

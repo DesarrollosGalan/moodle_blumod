@@ -16,6 +16,8 @@
 
 namespace core;
 
+use core\tests\fake_plugins_test_trait;
+
 /**
  * Unit tests for (some of) ../moodlelib.php.
  *
@@ -26,6 +28,8 @@ namespace core;
  * @author     nicolas@moodle.com
  */
 final class moodlelib_test extends \advanced_testcase {
+
+    use fake_plugins_test_trait;
 
     /**
      * Define a local decimal separator.
@@ -1495,14 +1499,14 @@ final class moodlelib_test extends \advanced_testcase {
         $this->assertEquals($longvalue,
             $DB->get_field('user_preferences', 'value', array('userid' => $USER->id, 'name' => '_test_long_user_preference')));
 
-        // Test > 1333 char values, coding_exception expected.
-        $longvalue = str_repeat('a', 1334);
-        try {
-            set_user_preference('_test_long_user_preference', $longvalue);
-            $this->fail('Exception expected - longer than 1333 chars not allowed as preference value');
-        } catch (\moodle_exception $ex) {
-            $this->assertInstanceOf('coding_exception', $ex);
-        }
+        // Larger preference values are allowed as of MDL-46739.
+        $longervalue = str_repeat('a', 1334);
+        set_user_preference('_test_long_user_preference', $longervalue);
+        $this->assertEquals($longervalue, get_user_preferences('_test_long_user_preference'));
+        $this->assertEquals(
+            $longervalue,
+            $DB->get_field('user_preferences', 'value', ['userid' => $USER->id, 'name' => '_test_long_user_preference'])
+        );
 
         // Test invalid params.
         try {
@@ -2951,7 +2955,7 @@ EOF;
      */
     public static function update_internal_user_password_no_cache_provider(): array {
         return [
-            'Password is not empty' => ['cas', 'wonkawonka'],
+            'Password is not empty' => ['db', 'wonkawonka'],
             'Password is an empty string' => ['oauth2', ''],
             'Password is null' => ['oauth2', null],
         ];
@@ -2966,7 +2970,7 @@ EOF;
 
         $user = $this->getDataGenerator()->create_user(array('password' => 'test'));
         $this->assertNotEquals(AUTH_PASSWORD_NOT_CACHED, $user->password);
-        $user->auth = 'cas'; // Change to a auth that does not store passwords.
+        $user->auth = 'db'; // Change to a auth that does not store passwords.
 
         $sink = $this->redirectEvents();
         update_internal_user_password($user, 'wonkawonka');
@@ -3215,14 +3219,14 @@ EOF;
         return array(
             'nopath' => array(
                 'wwwroot' => 'http://www.example.com',
-                'ids' => array(
+                'msgids' => array(
                     'a-custom-id' => '<a-custom-id@www.example.com>',
                     'an-id-with-/-a-slash' => '<an-id-with-%2F-a-slash@www.example.com>',
                 ),
             ),
             'path' => array(
                 'wwwroot' => 'http://www.example.com/path/subdir',
-                'ids' => array(
+                'msgids' => array(
                     'a-custom-id' => '<a-custom-id/path/subdir@www.example.com>',
                     'an-id-with-/-a-slash' => '<an-id-with-%2F-a-slash/path/subdir@www.example.com>',
                 ),
@@ -3283,7 +3287,7 @@ EOF;
             'nodiverts' => array(
                 'divertallemailsto' => null,
                 'divertallemailsexcept' => null,
-                array(
+                'addresses' => array(
                     'foo@example.com',
                     'test@real.com',
                     'fred.jones@example.com',
@@ -3291,12 +3295,12 @@ EOF;
                     'fred@example.com',
                     'fred+verp@example.com',
                 ),
-                false,
+                'expected' => false,
             ),
             'alldiverts' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => null,
-                array(
+                'addresses' => array(
                     'foo@example.com',
                     'test@real.com',
                     'fred.jones@example.com',
@@ -3304,65 +3308,65 @@ EOF;
                     'fred@example.com',
                     'fred+verp@example.com',
                 ),
-                true,
+                'expected' => true,
             ),
             'alsodiverts' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => '@dev.com, fred(\+.*)?@example.com',
-                array(
+                'addresses' => array(
                     'foo@example.com',
                     'test@real.com',
                     'fred.jones@example.com',
                     'Fred.Jones@Example.com',
                 ),
-                true,
+                'expected' => true,
             ),
             'divertsexceptions' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => '@dev.com, fred(\+.*)?@example.com',
-                array(
+                'addresses' => array(
                     'dev1@dev.com',
                     'fred@example.com',
                     'Fred@Example.com',
                     'fred+verp@example.com',
                 ),
-                false,
+                'expected' => false,
             ),
             'divertsexceptionsnewline' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => "@dev.com\nfred(\+.*)?@example.com",
-                array(
+                'addresses' => array(
                     'dev1@dev.com',
                     'fred@example.com',
                     'fred+verp@example.com',
                 ),
-                false,
+                'expected' => false,
             ),
             'alsodivertsnewline' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => "@dev.com\nfred(\+.*)?@example.com",
-                array(
+                'addresses' => array(
                     'foo@example.com',
                     'test@real.com',
                     'fred.jones@example.com',
                 ),
-                true,
+                'expected' => true,
             ),
             'alsodivertsblankline' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => "@dev.com\n",
-                [
+                'addresses' => [
                     'lionel@example.com',
                 ],
-                true,
+                'expected' => true,
             ),
             'divertsexceptionblankline' => array(
                 'divertallemailsto' => 'somewhere@elsewhere.com',
                 'divertallemailsexcept' => "@example.com\n",
-                [
+                'addresses' => [
                     'lionel@example.com',
                 ],
-                false,
+                'expected' => false,
             ),
         );
     }
@@ -3565,6 +3569,53 @@ EOF;
         $messagebody = reset($messages)->body;
         $this->assertStringNotContainsString('Content-Type: text/plain; name="' . $filename . '"', $messagebody);
         $this->assertStringNotContainsString('Content-Disposition: attachment; filename=' . $filename, $messagebody);
+    }
+
+    /**
+     * Test sending calendar (ICS) file attachments with email_to_user
+     *
+     * @covers ::email_to_user
+     */
+    public function test_email_to_user_calendar_attachment(): void {
+        global $CFG;
+
+        // Create a test calendar file in temp directory.
+        $temp = make_request_directory();
+        $filepath = $temp . '/test_calendar.ics';
+        $icalcontent = "BEGIN:VCALENDAR\r\n" .
+                       "VERSION:2.0\r\n" .
+                       "METHOD:REQUEST\r\n" .
+                       "BEGIN:VEVENT\r\n" .
+                       "SUMMARY:Test Event\r\n" .
+                       "DTSTART:20250704T140000\r\n" .
+                       "DTEND:20250704T150000\r\n" .
+                       "END:VEVENT\r\n" .
+                       "END:VCALENDAR";
+        file_put_contents($filepath, $icalcontent);
+
+        $user = \core_user::get_support_user();
+        $message = 'Test calendar attachment';
+
+        // Create sink to catch all sent e-mails.
+        $sink = $this->redirectEmails();
+
+        $filename = basename($filepath);
+        email_to_user($user, $user, $message, $message, $message, $filepath, $filename);
+
+        $messages = $sink->get_messages();
+        $sink->close();
+
+        $this->assertCount(1, $messages);
+
+        // Verify calendar content in message body.
+        $messagebody = reset($messages)->body;
+        // Check that it's not attached as a regular attachment.
+        $this->assertStringNotContainsString(
+            'Content-Disposition: attachment; filename=' . $filename,
+            $messagebody
+        );
+        // Check that it's included as iCal content.
+        $this->assertStringContainsString('Content-Type: text/calendar; method=REQUEST', $messagebody);
     }
 
     /**
@@ -5712,5 +5763,93 @@ EOT;
             ['setnew_password_and_mail', false],
             ['send_password_change_confirmation_email', $extrasendpasswordchangeconfirmationemail],
         ];
+    }
+
+    /**
+     * Test various moodlelib functions when dealing with a deprecated plugin type.
+     *
+     * @runInSeparateProcess
+     *
+     * @covers ::get_string_manager
+     * @covers ::component_callback_exists
+     * @covers ::component_callback
+     * @covers ::component_class_callback
+     * @covers ::get_plugins_with_function
+     * @covers ::get_plugin_list_with_function
+     * @return void
+     */
+    public function test_moodlelib_deprecated_plugintype(): void {
+        $this->resetAfterTest();
+        global $CFG;
+
+        // Inject the 'fake' plugin type and deprecate it.
+        // Note: this method of injection is required to ensure core_component fully builds all caches from the ground up,
+        // which is necessary to test things like class autoloading, required for class callbacks checks.
+        $this->add_full_mocked_plugintype(
+            plugintype: 'fake',
+            path: 'lib/tests/fixtures/fakeplugins/fake',
+        );
+        $this->deprecate_full_mocked_plugintype('fake');
+
+        // Verify strings can be fetched for deprecated plugins.
+        $stringman = get_string_manager();
+        $this->assertEquals('Fake full featured plugin', $stringman->get_string('pluginname', 'fake_fullfeatured'));
+
+        // Verify callbacks are NOT supported for deprecated plugins (falling back to using the default return).
+        $this->assertFalse(component_callback_exists('fake_fullfeatured', 'test_callback'));
+        $this->assertEquals('default', component_callback('fake_fullfeatured', 'test_callback', [], 'default'));
+        $this->assertEquals('cat', component_class_callback(\fake_fullfeatured\dummy::class, 'class_callback_test', [], 'cat'));
+
+        // Unset allversionshash to trigger a plugin functions rebuild, forcing it to pick up the injected mock plugin functions.
+        unset($CFG->allversionshash);
+        $plugins = get_plugins_with_function('test_callback');
+        $this->assertArrayNotHasKey('fake', $plugins);
+        $pluginlist = get_plugin_list_with_function('fake', 'test_callback');
+        $this->assertArrayNotHasKey('fake_fullfeatured', $pluginlist);
+    }
+
+    /**
+     * Test various moodlelib functions when dealing with a deleted plugin type.
+     *
+     * @runInSeparateProcess
+     *
+     * @covers ::get_string_manager
+     * @covers ::component_callback_exists
+     * @covers ::component_callback
+     * @covers ::component_class_callback
+     * @covers ::get_plugins_with_function
+     * @covers ::get_plugin_list_with_function
+     * @return void
+     */
+    public function test_moodlelib_deleted_plugintype(): void {
+        $this->resetAfterTest();
+        global $CFG;
+
+        // Inject the 'fake' plugin type and flag it as deleted.
+        // Note: this deep method of injection is required to ensure core_component fully builds all caches from the ground up,
+        // which is necessary to test things like class autoloading, required for class callbacks checks.
+        $this->add_full_mocked_plugintype(
+            plugintype: 'fake',
+            path: 'lib/tests/fixtures/fakeplugins/fake',
+        );
+        $this->delete_full_mocked_plugintype('fake');
+
+        // Verify no string support for deleted plugins.
+        $stringman = get_string_manager();
+        $this->assertEquals('[[pluginname]]', $stringman->get_string('pluginname', 'fake_fullfeatured'));
+        $this->assertDebuggingCalled();
+
+        // Verify callbacks are NOT supported for deleted plugins (falling back to using the default return).
+        $this->assertFalse(component_callback_exists('fake_fullfeatured', 'test_callback'));
+        $this->assertEquals('default', component_callback('fake_fullfeatured', 'test_callback', [], 'default'));
+        $this->assertEquals('default',
+            component_class_callback(\fake_fullfeatured\dummy::class, 'class_callback_test', [], 'default'));
+
+        // Unset allversionshash to trigger a plugin functions rebuild, forcing it to pick up the injected mock plugin functions.
+        unset($CFG->allversionshash);
+        $plugins = get_plugins_with_function('test_callback');
+        $this->assertArrayNotHasKey('fake', $plugins);
+        $pluginlist = get_plugin_list_with_function('fake', 'test_callback');
+        $this->assertArrayNotHasKey('fake_fullfeatured', $pluginlist);
     }
 }

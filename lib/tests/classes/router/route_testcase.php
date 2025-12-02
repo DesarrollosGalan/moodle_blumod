@@ -39,7 +39,7 @@ use Slim\Routing\RouteContext;
  * Tests for user preference API handler.
  *
  * @package    core
- * @copyright  2023 Andrew Lyons <andrew@nicols.co.uk>
+ * @copyright  Andrew Lyons <andrew@nicols.co.uk>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class route_testcase extends \advanced_testcase {
@@ -172,13 +172,9 @@ abstract class route_testcase extends \advanced_testcase {
      * @return App
      */
     protected function get_simple_app(): App {
-        global $CFG;
-        require_once("{$CFG->libdir}/nikic/fast-route/src/functions.php");
-        $app = bridge::create(
+        return bridge::create(
             container: \core\di::get_container(),
         );
-
-        return $app;
     }
 
     /**
@@ -238,8 +234,8 @@ abstract class route_testcase extends \advanced_testcase {
 
         $request = new ServerRequest(
             method: $method,
-            headers: $headers,
             uri: $uri,
+            headers: $headers,
             serverParams: $serverparams,
         );
 

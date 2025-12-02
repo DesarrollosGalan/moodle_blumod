@@ -1,8 +1,8 @@
 #!/bin/bash
 
 git fetch upstream
-for BRANCH in MOODLE_405_STABLE; do
-    git checkout $BRANCH
+for BRANCH in MOODLE_500_STABLE; do
+    git checkout -b $BRANCH upstream/$BRANCH
     # git pull --rebase upstream/$BRANCH
     git merge upstream/$BRANCH
     git push origin $BRANCH

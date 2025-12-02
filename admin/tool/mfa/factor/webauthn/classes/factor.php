@@ -16,10 +16,6 @@
 
 namespace factor_webauthn;
 
-defined('MOODLE_INTERNAL') || die();
-
-require_once($CFG->libdir . '/webauthn/src/WebAuthn.php');
-
 use lbuchs\WebAuthn\Binary\ByteBuffer;
 use lbuchs\WebAuthn\WebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
@@ -116,6 +112,15 @@ class factor extends object_factor_base {
     }
 
     /**
+     * Returns true if an additional setup button should be shown on the preferences page.
+     *
+     * @return bool
+     */
+    public function show_additional_setup_button(): bool {
+        return true;
+    }
+
+    /**
      * WebAuthn factor implementation.
      *
      * @param stdClass $user
@@ -153,6 +158,15 @@ class factor extends object_factor_base {
      */
     public function get_setup_string(): string {
         return get_string('setupfactorbutton', 'factor_webauthn');
+    }
+
+    /**
+     * Gets the string for additional setup button on preferences page.
+     *
+     * @return string
+     */
+    public function get_additional_setup_string(): string {
+        return get_string('setupfactorbuttonadditional', 'factor_webauthn');
     }
 
     /**

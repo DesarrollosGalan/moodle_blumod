@@ -38,6 +38,14 @@ define(
     'core_message/message_drawer_helper',
     'core/pending',
     'core/drawer',
+    'core/toast',
+    'core/str',
+    'core/config',
+    'core/ajax',
+    'core/local/aria/focuslock',
+    'core/modal_backdrop',
+    'core/templates',
+    'core/local/aria/selectors',
 ],
 function(
     $,
@@ -55,17 +63,26 @@ function(
     Events,
     Helper,
     Pending,
-    Drawer
+    Drawer,
+    Toast,
+    Str,
+    Config,
+    Ajax,
+    FocusLock,
+    ModalBackdrop,
+    Templates,
+    AriaSelectors,
 ) {
 
     var SELECTORS = {
         DRAWER: '[data-region="right-hand-drawer"]',
-        JUMPTO: '.popover-region [data-region="jumpto"]',
         PANEL_BODY_CONTAINER: '[data-region="panel-body-container"]',
         PANEL_HEADER_CONTAINER: '[data-region="panel-header-container"]',
         VIEW_CONTACT: '[data-region="view-contact"]',
         VIEW_CONTACTS: '[data-region="view-contacts"]',
         VIEW_CONVERSATION: '[data-region="view-conversation"]',
+        VIEW_CONVERSATION_WITH_ID: '[data-region="view-conversation"][data-conversation-id]',
+        VIEW_CONVERSATION_WITH_USER: '[data-region="view-conversation"][data-other-user-id]',
         VIEW_GROUP_INFO: '[data-region="view-group-info"]',
         VIEW_OVERVIEW: '[data-region="view-overview"]',
         VIEW_SEARCH: '[data-region="view-search"]',
@@ -75,7 +92,9 @@ function(
         HEADER_CONTAINER: '[data-region="header-container"]',
         BODY_CONTAINER: '[data-region="body-container"]',
         FOOTER_CONTAINER: '[data-region="footer-container"]',
-        CLOSE_BUTTON: '[data-action="closedrawer"]'
+        CLOSE_BUTTON: '[data-action="closedrawer"]',
+        MESSAGE_INDEX: '[data-region="message-index"]',
+        MESSAGE_TEXT_AREA: '[data-region="send-message-txt"]',
     };
 
     /**
@@ -129,6 +148,69 @@ function(
         });
     };
 
+    let backdropPromise = null;
+
+    /**
+     * Set the focus on the drawer.
+     *
+     * This method also creates or destroy any necessary backdrop zone and focus trap.
+     *
+     * @param {Object} root The message drawer container.
+     * @param {Boolean} hasFocus Whether the drawer has focus or not.
+     */
+    var setFocus = function(root, hasFocus) {
+        var drawerRoot = Drawer.getDrawerRoot(root);
+        if (!drawerRoot.length) {
+            return;
+        }
+        if (!backdropPromise) {
+            backdropPromise = Templates.render('core/modal_backdrop', {})
+                .then(html => new ModalBackdrop(html));
+        }
+        const backdropWithAdjustments = backdropPromise.then(modalBackdrop => {
+            const messageDrawerZIndex = window.getComputedStyle(drawerRoot[0]).zIndex;
+            if (messageDrawerZIndex) {
+                modalBackdrop.setZIndex(messageDrawerZIndex - 1);
+            }
+            modalBackdrop.getAttachmentPoint().get(0).addEventListener('click', e => {
+                PubSub.publish(Events.HIDE, {});
+                e.preventDefault();
+            });
+            return modalBackdrop;
+        });
+        if (hasFocus) {
+            FocusLock.trapFocus(root[0]);
+            // eslint-disable-next-line promise/catch-or-return
+            backdropWithAdjustments.then(modalBackdrop => {
+                if (modalBackdrop) {
+                    modalBackdrop.show();
+                    const pageWrapper = document.getElementById('page');
+                    pageWrapper.style.overflow = 'hidden';
+                    // Set the focus on the close button so when we press enter, it closes the drawer as it did before
+                    var closeButton = root.find(SELECTORS.CLOSE_BUTTON);
+                    if (closeButton.length) {
+                        closeButton.focus();
+                    }
+                }
+                return modalBackdrop;
+            });
+        } else {
+            // eslint-disable-next-line promise/catch-or-return
+            backdropWithAdjustments.then(modalBackdrop => {
+                if (modalBackdrop) {
+                    FocusLock.untrapFocus();
+                    var button = $(SELECTORS.DRAWER).attr('data-origin');
+                    if (button) {
+                        $('#' + button).focus();
+                    }
+                    modalBackdrop.hide();
+                    const pageWrapper = document.getElementById('page');
+                    pageWrapper.style.overflow = 'visible';
+                }
+                return modalBackdrop;
+            });
+        }
+    };
     /**
      * Show the message drawer.
      *
@@ -143,6 +225,7 @@ function(
 
         var drawerRoot = Drawer.getDrawerRoot(root);
         if (drawerRoot.length) {
+            setFocus(root, true);
             Drawer.show(drawerRoot);
         }
     };
@@ -155,6 +238,7 @@ function(
     var hide = function(root) {
         var drawerRoot = Drawer.getDrawerRoot(root);
         if (drawerRoot.length) {
+            setFocus(root, false);
             Drawer.hide(drawerRoot);
         }
     };
@@ -183,6 +267,165 @@ function(
     };
 
     /**
+     * Store an unsent message.
+     *
+     * Don't store this if the user has already seen the unsent message.
+     * This avoids spamming and ensures the user is only reminded once per unsent message.
+     * If the unsent message is sent, this attribute is removed and notification is possible again (see sendMessage).
+     */
+    const storeUnsentMessage = async() => {
+        const messageTextArea = document.querySelector(SELECTORS.MESSAGE_TEXT_AREA);
+
+        if (messageTextArea.value.trim().length > 0 && !messageTextArea.hasAttribute('data-unsent-message-viewed')) {
+
+            let message = messageTextArea.value;
+            let conversationid = 0;
+            let otheruserid = 0;
+
+            // We don't always have a conversation to link the unsent message to, so let's check for that.
+            const conversationId = document.querySelector(SELECTORS.VIEW_CONVERSATION_WITH_ID);
+            if (conversationId) {
+                const conversationWithId = messageTextArea.closest(SELECTORS.VIEW_CONVERSATION_WITH_ID);
+                conversationid = conversationWithId.getAttribute('data-conversation-id');
+            }
+            // Store the 'other' user id if it is there. This can be used to create conversations.
+            const conversationUser = document.querySelector(SELECTORS.VIEW_CONVERSATION_WITH_USER);
+            if (conversationUser) {
+                const conversationWithUser = messageTextArea.closest(SELECTORS.VIEW_CONVERSATION_WITH_USER);
+                otheruserid = conversationWithUser.getAttribute('data-other-user-id');
+            }
+
+            setStoredUnsentMessage(message, conversationid, otheruserid);
+        }
+    };
+
+    /**
+     * Get the stored unsent message from the session via web service.
+     *
+     * @returns {Promise}
+     */
+    const getStoredUnsentMessage = () => Ajax.call([{
+        methodname: 'core_message_get_unsent_message',
+        args: {}
+    }])[0];
+
+    /**
+     * Set the unsent message value in the session via web service.
+     *
+     * SendBeacon is used here because this is called on 'beforeunload'.
+     *
+     * @param {string} message The message string.
+     * @param {number} conversationid The conversation id.
+     * @param {number} otheruserid The other user id.
+     * @returns {Promise}
+     */
+    const setStoredUnsentMessage = (message, conversationid, otheruserid) => {
+        const method = 'core_message_set_unsent_message';
+        const requestUrl = new URL(`${Config.wwwroot}/lib/ajax/service.php`);
+        requestUrl.searchParams.set('sesskey', Config.sesskey);
+        requestUrl.searchParams.set('info', method);
+
+        navigator.sendBeacon(requestUrl, JSON.stringify([{
+            index: 0,
+            methodname: method,
+            args: {
+                message: message,
+                conversationid: conversationid,
+                otheruserid: otheruserid,
+            }
+        }]));
+    };
+
+    /**
+     * Check for an unsent message.
+     *
+     * @param {String} uniqueId Unique identifier for the Routes.
+     * @param {Object} root The message drawer container.
+     */
+    const getUnsentMessage = async(uniqueId, root) => {
+        let type;
+        let messageRoot;
+
+        // We need to check if we are on the message/index page.
+        // This logic is needed to handle the two message widgets here and ensure we are targetting the right one.
+        const messageIndex = document.querySelector(SELECTORS.MESSAGE_INDEX);
+        if (messageIndex !== null) {
+            type = 'index';
+            messageRoot = document.getElementById(`message-index-${uniqueId}`);
+            if (!messageRoot) {
+                // This is not the correct widget.
+                return;
+            }
+
+        } else {
+            type = 'drawer';
+            messageRoot = document.getElementById(`message-drawer-${uniqueId}`);
+        }
+
+        const storedMessage = await getStoredUnsentMessage();
+        const messageTextArea = messageRoot.querySelector(SELECTORS.MESSAGE_TEXT_AREA);
+        if (storedMessage.message && messageTextArea !== null) {
+            showUnsentMessage(messageTextArea, storedMessage, type, uniqueId, root);
+        }
+    };
+
+    /**
+     * Show an unsent message.
+     *
+     * There are two message widgets on the message/index page.
+     * Because of that, we need to try and target the correct widget.
+     *
+     * @param {String} textArea The textarea element.
+     * @param {Object} stored The stored message content.
+     * @param {String} type Is this from the drawer or index page?
+     * @param {String} uniqueId Unique identifier for the Routes.
+     * @param {Object} root The message drawer container.
+     */
+    const showUnsentMessage = (textArea, stored, type, uniqueId, root) => {
+        // The user has already been notified.
+        if (textArea.hasAttribute('data-unsent-message-viewed')) {
+            return;
+        }
+
+        // Depending on the type, show the conversation with the data we have available.
+        // A conversation can be continued if there is a conversationid.
+        // If the user was messaging a new non-contact, we won't have a conversationid yet.
+        // In that case, we use the otheruserid value to start a conversation with them.
+        switch (type) {
+            case 'index':
+                // Show the conversation in the main panel on the message/index page.
+                if (stored.conversationid) {
+                    Router.go(uniqueId, Routes.VIEW_CONVERSATION, stored.conversationid, 'frompanel');
+                // There was no conversation id, let's get a conversation going using the user id.
+                } else if (stored.otheruserid) {
+                    Router.go(uniqueId, Routes.VIEW_CONVERSATION, null, 'create', stored.otheruserid);
+                }
+                break;
+
+            case 'drawer':
+                // Open the drawer and show the conversation.
+                if (stored.conversationid) {
+                    let args = {
+                        conversationid: stored.conversationid
+                    };
+                    Helper.showConversation(args);
+                // There was no conversation id, let's get a conversation going using the user id.
+                } else if (stored.otheruserid) {
+                    show(uniqueId, root);
+                    Router.go(uniqueId, Routes.VIEW_CONVERSATION, null, 'create', stored.otheruserid);
+                }
+                break;
+        }
+
+        // Populate the text area.
+        textArea.value = stored.message;
+        textArea.setAttribute('data-unsent-message-viewed', 1);
+
+        // Notify the user.
+        Toast.add(Str.get_string('unsentmessagenotification', 'core_message'));
+    };
+
+    /**
      * Listen to and handle events for routing, showing and hiding the message drawer.
      *
      * @param {string} namespace The route namespace.
@@ -190,7 +433,7 @@ function(
      * @param {bool} alwaysVisible Is this messaging app always shown?
      */
     var registerEventListeners = function(namespace, root, alwaysVisible) {
-        CustomEvents.define(root, [CustomEvents.events.activate]);
+        CustomEvents.define(root, [CustomEvents.events.activate, CustomEvents.events.escape]);
         var paramRegex = /^data-route-param-?(\d*)$/;
 
         root.on(CustomEvents.events.activate, SELECTORS.ROUTES, function(e, data) {
@@ -239,19 +482,49 @@ function(
             data.originalEvent.preventDefault();
         });
 
+        // Close the message drawer if the drawer is visible and the click happened outside the drawer and the toggle button.
+        $(document).on(CustomEvents.events.activate, e => {
+            var drawer = $(e.target).closest(SELECTORS.DRAWER);
+            var toggleButtonId = $(SELECTORS.DRAWER)?.attr('data-origin');
+            var toggleButton = '';
+            if (toggleButtonId !== undefined && toggleButtonId) {
+                toggleButton = $(e.target).closest("#" + toggleButtonId);
+            }
+
+            if (!drawer.length && !toggleButton.length && isVisible(root)) {
+                // Determine if the element that was clicked is focusable.
+                var focusableElement = $(e.target).closest(AriaSelectors.elements.focusable);
+                if (focusableElement.length) {
+                    // We need to move the focus to the clicked element after the drawer is hidden,
+                    // so we need to clear the `data-origin` attribute first.
+                    $(SELECTORS.DRAWER).attr('data-origin', '');
+                }
+                // Hide the drawer.
+                hide(root);
+                // Move the focus to the clicked element if it is focusable.
+                if (focusableElement.length) {
+                    focusableElement.focus();
+                }
+            }
+        });
+
         // These are theme-specific to help us fix random behat fails.
         // These events target those events defined in BS3 and BS4 onwards.
-        root.on('hide.bs.collapse', '.collapse', function(e) {
-            var pendingPromise = new Pending();
-            $(e.target).one('hidden.bs.collapse', function() {
-                pendingPromise.resolve();
+        root[0].querySelectorAll('.collapse').forEach((collapse) => {
+            collapse.addEventListener('hide.bs.collapse', (e) => {
+                var pendingPromise = new Pending();
+                e.target.addEventListener('hidden.bs.collapse', function() {
+                    pendingPromise.resolve();
+                }, {once: true});
             });
         });
 
-        root.on('show.bs.collapse', '.collapse', function(e) {
-            var pendingPromise = new Pending();
-            $(e.target).one('shown.bs.collapse', function() {
-                pendingPromise.resolve();
+        root[0].querySelectorAll('.collapse').forEach((collapse) => {
+            collapse.addEventListener('show.bs.collapse', (e) => {
+                var pendingPromise = new Pending();
+                e.target.addEventListener('shown.bs.collapse', function() {
+                    pendingPromise.resolve();
+                }, {once: true});
             });
         });
 
@@ -293,6 +566,9 @@ function(
                     $(SELECTORS.JUMPTO).attr('tabindex', 0);
                 }
             });
+            root.on(CustomEvents.events.escape, function() {
+                PubSub.publish(Events.HIDE, {});
+            });
         }
 
         PubSub.subscribe(Events.SHOW_CONVERSATION, function(args) {
@@ -304,7 +580,7 @@ function(
         var closebutton = root.find(SELECTORS.CLOSE_BUTTON);
         closebutton.on(CustomEvents.events.activate, function(e, data) {
             data.originalEvent.preventDefault();
-
+            setFocus(root, false);
             var button = $(SELECTORS.DRAWER).attr('data-origin');
             if (button) {
                 $('#' + button).focus();
@@ -334,6 +610,18 @@ function(
                 viewConversationFooter.attr('data-enter-to-send', enterToSendPreference.value);
             }
         });
+
+        // If our textarea is modified, remove the attribute which indicates the user has seen the unsent message notification.
+        // This will allow the user to be notified again.
+        const textArea = document.querySelector(SELECTORS.MESSAGE_TEXT_AREA);
+        if (textArea) {
+            textArea.addEventListener('keyup', function() {
+                textArea.removeAttribute('data-unsent-message-viewed');
+            });
+        }
+
+        // Catch any unsent messages and store them.
+        window.addEventListener('beforeunload', storeUnsentMessage);
     };
 
     /**
@@ -361,6 +649,9 @@ function(
 
         // Mark the drawer as ready.
         Helper.markDrawerReady();
+
+        // Get and show any unsent message.
+        getUnsentMessage(uniqueId, root);
     };
 
     return {

@@ -279,7 +279,8 @@ if (!$csv) {
     }
 
     print '<div id="completion-progress-wrapper" class="no-overflow">';
-    print '<table id="completion-progress" class="generaltable flexible boxaligncenter"><thead><tr style="vertical-align:top">';
+    print '<table id="completion-progress" ' .
+        'class="generaltable flexible boxaligncenter table table-hover"><thead><tr style="vertical-align:top">';
 
     // User heading / sort option
     print '<th scope="col" class="completion-sortchoice">';
@@ -314,14 +315,10 @@ foreach($activities as $activity) {
     $datepassed = $activity->completionexpected && $activity->completionexpected <= time();
     $datepassedclass = $datepassed ? 'completion-expired' : '';
 
-    if ($activity->completionexpected) {
-        if ($csv) {
-            $datetext = userdate($activity->completionexpected, "%F %T");
-        } else {
-            $datetext = userdate($activity->completionexpected, get_string('strftimedate', 'langconfig'));
-        }
+    if ($activity->completionexpected && !$csv) {
+        $datetext = userdate($activity->completionexpected, get_string('strftimedate', 'langconfig'));
     } else {
-        $datetext='';
+        $datetext = get_string('completed');
     }
 
     // Some names (labels) come URL-encoded and can be very long, so shorten them

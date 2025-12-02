@@ -16,6 +16,7 @@
 
 namespace core;
 
+use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use phpunit_util;
 
 /**
@@ -235,16 +236,7 @@ STRING;
         global $DB;
         $DB->set_field('user', 'confirmed', 1, ['id' => -1]);
 
-        // Let's convert the user warnings into an assert-able exception.
-        set_error_handler(
-            static function ($errno, $errstr) {
-                restore_error_handler();
-                throw new \Exception($errstr, $errno);
-            },
-            E_USER_WARNING // Or any other specific E_ that we want to assert.
-        );
-
-        $this->expectException(\Exception::class);
+        $this->expectException(\core_phpunit\exception\test_exception::class);
         $this->expectExceptionMessage('Warning: unexpected database modification');
         phpunit_util::reset_all_data(true);
     }
@@ -261,15 +253,6 @@ STRING;
         unset($CFG->admin);
         $CFG->rolesactive = 0;
 
-        // Let's convert the user warnings into an assert-able exception.
-        set_error_handler(
-            static function ($errno, $errstr) {
-                restore_error_handler();
-                throw new \Exception($errstr, $errno);
-            },
-            E_USER_WARNING // Or any other specific E_ that we want to assert.
-        );
-
         $this->expectException(\Exception::class);
         $this->expectExceptionMessageMatches('/rolesactive.*xx value.*removal.*admin/ms'); // 3 messages matched.
         phpunit_util::reset_all_data(true);
@@ -285,15 +268,6 @@ STRING;
         global $USER;
         $USER->id = 10;
 
-        // Let's convert the user warnings into an assert-able exception.
-        set_error_handler(
-            static function ($errno, $errstr) {
-                restore_error_handler();
-                throw new \Exception($errstr, $errno);
-            },
-            E_USER_WARNING // Or any other specific E_ that we want to assert.
-        );
-
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Warning: unexpected change of $USER');
         phpunit_util::reset_all_data(true);
@@ -308,15 +282,6 @@ STRING;
     public function test_course_modification(): void {
         global $COURSE;
         $COURSE->id = 10;
-
-        // Let's convert the user warnings into an assert-able exception.
-        set_error_handler(
-            static function ($errno, $errstr) {
-                restore_error_handler();
-                throw new \Exception($errstr, $errno);
-            },
-            E_USER_WARNING // Or any other specific E_ that we want to assert.
-        );
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Warning: unexpected change of $COURSE');
@@ -337,15 +302,6 @@ STRING;
         $CFG->rolesactive = 0;
         $USER->id = 10;
         $COURSE->id = 10;
-
-        // Let's convert the user warnings into an assert-able exception.
-        set_error_handler(
-            static function ($errno, $errstr) {
-                restore_error_handler();
-                throw new \Exception($errstr, $errno);
-            },
-            E_USER_WARNING // Or any other specific E_ that we want to assert.
-        );
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessageMatches('/resetting.*rolesactive.*new.*removal.*USER.*COURSE/ms'); // 6 messages matched.
@@ -376,5 +332,26 @@ STRING;
         // Assert that the transaction is now closed and the changes were rolled back.
         $this->assertFalse($DB->is_transaction_started());
         $this->assertEquals($originalname, $DB->get_field('course', 'fullname', ['id' => $COURSE->id]));
+    }
+
+    /**
+     * Test that the navigation node URL is overridden correctly.
+     */
+    public function test_set_navigation_url(): void {
+        \navigation_node::override_active_url(new \core\url('/foo/bar/baz'));
+        $this->assertNotNull(
+            (new \ReflectionClass(\navigation_node::class))->getStaticPropertyValue('fullmeurl', null),
+        );
+    }
+
+    /**
+     * Test that the after-test teardown correctly resets the navigation node URL.
+     *
+     * @depends test_set_navigation_url
+     */
+    public function test_navigation_url_reset(): void {
+        $this->assertNull(
+            (new \ReflectionClass(\navigation_node::class))->getStaticPropertyValue('fullmeurl', null),
+        );
     }
 }

@@ -194,7 +194,7 @@ class manager {
      * @param adhoc_task $task
      * @return \stdClass|false
      */
-    protected static function get_queued_adhoc_task_record($task) {
+    public static function get_queued_adhoc_task_record($task) {
         global $DB;
 
         $record = self::record_from_adhoc_task($task);
@@ -245,6 +245,11 @@ class manager {
         global $DB;
 
         $clock = \core\di::get(\core\clock::class);
+
+        // Don't queue tasks for deprecated components.
+        if (self::task_component_is_deprecated($task)) {
+            return false;
+        }
 
         if ($userid = $task->get_userid()) {
             // User found. Check that they are suitable.
@@ -509,11 +514,17 @@ class manager {
      * This function load the adhoc tasks for a given classname.
      *
      * @param string $classname
-     * @param bool $failedonly
-     * @param bool $skiprunning do not return tasks that are in the running state
+     * @param bool $failedonly Return only failed tasks
+     * @param bool $skiprunning Do not return tasks that are in the running state
+     * @param bool $dueonly Return only tasks that are due to run (nextruntime < now)
      * @return array
      */
-    public static function get_adhoc_tasks(string $classname, bool $failedonly = false, bool $skiprunning = false): array {
+    public static function get_adhoc_tasks(
+        string $classname,
+        bool $failedonly = false,
+        bool $skiprunning = false,
+        bool $dueonly = false
+    ): array {
         global $DB;
 
         $conds[] = 'classname = ?';
@@ -521,6 +532,8 @@ class manager {
 
         if ($failedonly) {
             $conds[] = 'faildelay > 0';
+        } else if ($dueonly) {
+            $conds[] = 'faildelay = 0';
         }
         if ($skiprunning) {
             $conds[] = 'timestarted IS NULL';
@@ -636,10 +649,18 @@ class manager {
 
         foreach ($records as $record) {
             $task = self::scheduled_task_from_record($record);
+
             // Safety check in case the task in the DB does not match a real class (maybe something was uninstalled).
-            if ($task) {
-                $tasks[] = $task;
+            if (!$task) {
+                continue;
             }
+
+            // Tasks belonging to deprecated plugin types are excluded.
+            if (self::task_component_is_deprecated($task)) {
+                continue;
+            }
+
+            $tasks[] = $task;
         }
 
         return $tasks;
@@ -672,7 +693,7 @@ class manager {
      */
     #[\core\attribute\deprecated('\core\task\manager::get_next_adhoc_task()', since: '4.1', mdl: 'MDL-67648', final: true)]
     public static function ensure_adhoc_task_qos(): void {
-        \core\deprecation::emit_deprecation_if_present([self::class, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -955,6 +976,17 @@ class manager {
     }
 
     /**
+     * This function will delete an adhoc task by id. The task will be removed
+     * from the database.
+     *
+     * @param int $taskid
+     */
+    public static function delete_adhoc_task(int $taskid): void {
+        global $DB;
+        $DB->delete_records('task_adhoc', ['id' => $taskid]);
+    }
+
+    /**
      * This function will set locks on the task.
      *
      * @param adhoc_task    $task
@@ -972,6 +1004,22 @@ class manager {
 
         $task->set_lock($lock);
         $cronlock->release();
+    }
+
+    /**
+     * Helper to check whether a task's component is deprecated.
+     *
+     * @param task_base $task the task instance
+     * @return bool true if deprecated, false otherwise.
+     */
+    private static function task_component_is_deprecated(task_base $task): bool {
+        // Only supports plugin type deprecation. Info will be null for other, non-plugin components.
+        if ($info = \core_plugin_manager::instance()->get_plugin_info($task->get_component())) {
+            if ($info->is_deprecated() || $info->is_deleted()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -999,8 +1047,8 @@ class manager {
 
             $task = self::scheduled_task_from_record($record);
             // Safety check in case the task in the DB does not match a real class (maybe something was uninstalled).
-            // Also check to see if task is disabled or enabled after applying overrides.
-            if (!$task || $task->get_disabled()) {
+            // Also check to see if task is disabled or enabled after applying overrides, or if the plugintype is deprecated.
+            if (!$task || $task->get_disabled() || self::task_component_is_deprecated($task)) {
                 continue;
             }
 
@@ -1082,14 +1130,17 @@ class manager {
      * This function indicates that an adhoc task was not completed successfully and should be retried.
      *
      * @param \core\task\adhoc_task $task
+     * @param bool $finaliselog finalise the log of the current running task
      */
-    public static function adhoc_task_failed(adhoc_task $task) {
+    public static function adhoc_task_failed(adhoc_task $task, bool $finaliselog = true) {
         global $DB;
 
         $clock = \core\di::get(\core\clock::class);
 
         // Finalise the log output.
-        logmanager::finalise_log(true);
+        if ($finaliselog) {
+            logmanager::finalise_log(true);
+        }
 
         $delay = $task->get_fail_delay();
 
@@ -1192,14 +1243,17 @@ class manager {
      * This function indicates that a scheduled task was not completed successfully and should be retried.
      *
      * @param \core\task\scheduled_task $task
+     * @param bool $finaliselog finalise the log of the current running task
      */
-    public static function scheduled_task_failed(scheduled_task $task) {
+    public static function scheduled_task_failed(scheduled_task $task, bool $finaliselog = true) {
         global $DB;
 
         $clock = \core\di::get(\core\clock::class);
 
         // Finalise the log output.
-        logmanager::finalise_log(true);
+        if ($finaliselog) {
+            logmanager::finalise_log(true);
+        }
 
         $delay = $task->get_fail_delay();
 
@@ -1418,7 +1472,10 @@ class manager {
 
                     $task = self::scheduled_task_from_record($taskrecord);
                     $task->set_lock($lock);
-                    self::scheduled_task_failed($task);
+
+                    // We have to skip log finalisation when failing the task as the finalise_log method from
+                    // the log manager is only aware of the current running task (i.e., the cleanup task).
+                    self::scheduled_task_failed($task, false);
                 } else if ($runningtask->type == 'adhoc') {
                     // Ad hoc tasks are removed from the DB if they finish successfully.
                     // If we can't re-get this task, that means it finished and was properly
@@ -1430,7 +1487,10 @@ class manager {
 
                     $task = self::adhoc_task_from_record($taskrecord);
                     $task->set_lock($lock);
-                    self::adhoc_task_failed($task);
+
+                    // We have to skip log finalisation when failing the task as the finalise_log method from
+                    // the log manager is only aware of the current running task (i.e., the cleanup task).
+                    self::adhoc_task_failed($task, false);
                 }
             }
         }

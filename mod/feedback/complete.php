@@ -25,8 +25,6 @@
 require_once("../../config.php");
 require_once("lib.php");
 
-feedback_init_feedback_session();
-
 $id = required_param('id', PARAM_INT);
 $courseid = optional_param('courseid', null, PARAM_INT);
 $gopage = optional_param('gopage', 0, PARAM_INT);
@@ -134,7 +132,11 @@ if ($feedbackcompletion->is_empty()) {
     }
 } else {
     echo $OUTPUT->box_start('generalbox boxaligncenter');
-    echo $OUTPUT->notification(get_string('this_feedback_is_already_submitted', 'feedback'));
+    echo $OUTPUT->notification(
+        get_string('this_feedback_is_already_submitted', 'feedback'),
+        \core\output\notification::NOTIFY_INFO,
+        closebutton: false,
+    );
     echo $OUTPUT->continue_button(course_get_url($courseid ?: $course->id));
     echo $OUTPUT->box_end();
 }

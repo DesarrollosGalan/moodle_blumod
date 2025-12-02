@@ -56,11 +56,17 @@ if (!empty($showonly)) {
 }
 
 if (!empty($add)) {
-    $section = required_param('section', PARAM_INT);
     $course  = required_param('course', PARAM_INT);
 
+    $sectionid = optional_param('sectionid', null, PARAM_INT);
+    if (empty($sectionid)) {
+        $sectionnum = required_param('section', PARAM_INT);
+    } else {
+        $sectionnum = get_fast_modinfo($course)->get_section_info_by_id($sectionid, MUST_EXIST)->sectionnum;
+    }
+
     $url->param('add', $add);
-    $url->param('section', $section);
+    $url->param('section', $sectionnum);
     $url->param('course', $course);
     $PAGE->set_url($url);
 
@@ -70,18 +76,18 @@ if (!empty($add)) {
     // There is no page for this in the navigation. The closest we'll have is the course section.
     // If the course section isn't displayed on the navigation this will fall back to the course which
     // will be the closest match we have.
-    navigation_node::override_active_url(course_get_url($course, $section));
+    navigation_node::override_active_url(course_get_url($course, $sectionnum));
 
-    // MDL-69431 Validate that $section (url param) does not exceed the maximum for this course / format.
+    // MDL-69431 Validate that $sectionnum (from url param) does not exceed the maximum for this course / format.
     // If too high (e.g. section *id* not number) non-sequential sections inserted in course_sections table.
     // Then on import, backup fills 'gap' with empty sections (see restore_rebuild_course_cache). Avoid this.
     $courseformat = course_get_format($course);
     $maxsections = $courseformat->get_max_sections();
-    if ($section > $maxsections) {
+    if ($sectionnum > $maxsections) {
         throw new \moodle_exception('maxsectionslimit', 'moodle', '', $maxsections);
     }
 
-    list($module, $context, $cw, $cm, $data) = prepare_new_moduleinfo_data($course, $add, $section);
+    [$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, $add, $sectionnum);
     $data->return = 0;
     if (!is_null($sectionreturn)) {
         $data->sr = $sectionreturn;
@@ -168,6 +174,8 @@ if ($mform->is_cancelled()) {
         ];
         $activityurl = new moodle_url("/mod/$module->name/view.php", $urlparams);
         redirect($activityurl);
+    } else if (plugin_supports('mod', $module->name, FEATURE_PUBLISHES_QUESTIONS)) {
+        redirect(\core_question\local\bank\question_bank_helper::get_url_for_qbank_list($course->id));
     } else {
         $options = [];
         if (!is_null($sectionreturn)) {
@@ -192,19 +200,14 @@ if ($mform->is_cancelled()) {
         if (!empty($fromform->showgradingmanagement)) {
             $url = $fromform->gradingman->get_management_url($url);
         }
+    } else if (plugin_supports('mod', $fromform->modulename, FEATURE_PUBLISHES_QUESTIONS)) {
+        $url = \core_question\local\bank\question_bank_helper::get_url_for_qbank_list($course->id);
     } else {
         $options = [];
         if (!is_null($sectionreturn)) {
             $options['sr'] = $sectionreturn;
         }
         $url = course_get_url($course, $cw->section, $options);
-    }
-
-    // If we need to regrade the course with a progress bar as a result of updating this module,
-    // redirect first to the page that will do this.
-    if (isset($fromform->needsfrontendregrade)) {
-        $url = new moodle_url('/course/modregrade.php', ['id' => $fromform->coursemodule,
-                'url' => $url->out_as_local_url(false)]);
     }
 
     redirect($url);

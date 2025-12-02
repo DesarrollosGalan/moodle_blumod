@@ -428,14 +428,61 @@ final class extension_test extends \advanced_testcase {
             'mod_instance_helper with plugin disabled' => [
                 'bbbenabled' => false,
                 'apiclass' => mod_instance_helper::class,
-                'result' => [],
+                'extensionclasses' => [],
             ],
             'mod_instance_helper with plugin enabled' => [
                 'bbbenabled' => true,
                 'apiclass' => mod_instance_helper::class,
-                'result' => [
+                'extensionclasses' => [
                     'bbbext_simple\\bigbluebuttonbn\\mod_instance_helper',
                 ],
+            ],
+        ];
+    }
+
+    /**
+     * Test the get_sorted_plugins_list
+     * @param array $sortorders
+     * @param array $expected
+     * @return void
+     * @dataProvider sorted_plugins_list_data_provider
+     * @covers \mod_bigbluebuttonbn\extension::get_sorted_plugins_list
+     */
+    public function test_get_sorted_plugins_list(array $sortorders, array $expected): void {
+        $this->resetAfterTest();
+        // Enable plugin.
+        $this->enable_plugins(true);
+        // Create list of plugins we will then sort.
+        $pluginlist = [
+            'simpleone' => '/path/to/simpleone',
+            'simpletwo' => '/path/to/simpletwo',
+        ];
+        // Set sortorder.
+        foreach ($sortorders as $plugin => $sortorder) {
+            set_config('sortorder', $sortorder, 'bbbext_' . $plugin);
+        }
+        $sortedlist = extension::get_sorted_plugins_list($pluginlist);
+        $this->assertSame($expected, $sortedlist);
+    }
+
+    /**
+     * Data provider for testing get_sorted_plugins_list
+     *
+     * @return array[]
+     */
+    public static function sorted_plugins_list_data_provider(): array {
+        return [
+            'no sortorder' => [
+                [],
+                ['simpleone', 'simpletwo'],
+            ],
+            'default sortorder' => [
+                ['simpleone' => 0, 'simpletwo' => 1],
+                ['simpleone', 'simpletwo'],
+            ],
+            'changed sortorder' => [
+                ['simpleone' => 1, 'simpletwo' => 0],
+                ['simpletwo', 'simpleone'],
             ],
         ];
     }

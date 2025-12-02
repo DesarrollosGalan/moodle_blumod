@@ -89,13 +89,16 @@ $string['issuershowonloginpage'] = 'Show on login page';
 $string['issuerrequireconfirmation_help'] = 'Require that all users verify their email address before they can log in with OAuth. This applies to newly created accounts as part of the login process, or when an existing Moodle account is connected to an OAuth login via matching email addresses.';
 $string['issuerrequireconfirmation'] = 'Require email verification';
 $string['issuers'] = 'Issuers';
+$string['issuersmtpsystememail'] = 'SMTP email';
+$string['issuersmtpsystememail_help'] = 'If specified, this email will be used to connect a system account for sending email via SMTP. This is required for some OAuth 2 services (e.g. Microsoft). Please check the documentation for your OAuth 2 service to see if this is required.';
 $string['issuersservicesallow'] = 'Allow services';
 $string['issuersservicesnotallow'] = 'Do not allow services';
 $string['issuerusein'] = 'This service will be used';
-$string['issuerusein_help'] = 'OAuth 2 services can be used for internal services, on the login page, or both, if required.';
+$string['issuerusein_help'] = 'OAuth 2 services can be used for internal services, on the login page, SMTP with XOAUTH2, or both login page and internal services, if required.';
 $string['issueruseineverywhere'] = 'Login page and internal services';
 $string['issueruseininternalonly'] = 'Internal services only';
 $string['issueruseinloginonly'] = 'Login page only';
+$string['issueruseinsmtpwithoauth'] = 'SMTP with XOAUTH2 only';
 $string['issuerusedforlogin'] = 'Login';
 $string['issuerusedforinternal'] = 'Internal services';
 $string['linkedin_service'] = 'LinkedIn';
@@ -124,6 +127,3 @@ $string['userfieldinternalfield'] = 'Internal field name';
 $string['userfieldmappingdeleted'] = 'User field mapping deleted';
 $string['userfieldmappingsforissuer'] = 'User field mappings for issuer: {$a}';
 $string['privacy:metadata'] = 'The OAuth 2 services plugin does not store any personal data.';
-
-// Deprecated since Moodle 4.3.
-$string['imsobv2p1_service'] = 'Open Badges';

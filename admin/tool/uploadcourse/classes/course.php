@@ -509,8 +509,12 @@ class tool_uploadcourse_course {
         }
 
         // Ensure we don't overflow the maximum length of the fullname field.
-        if (!empty($coursedata['fullname']) && core_text::strlen($coursedata['fullname']) > 254) {
-            $this->error('invalidfullnametoolong', new lang_string('invalidfullnametoolong', 'tool_uploadcourse', 254));
+        if (
+            !empty($coursedata['fullname']) &&
+            core_text::strlen($coursedata['fullname']) > \core_course\constants::FULLNAME_MAXIMUM_LENGTH
+        ) {
+            $this->error('invalidfullnametoolong', new lang_string('invalidfullnametoolong', 'tool_uploadcourse',
+                \core_course\constants::FULLNAME_MAXIMUM_LENGTH));
             return false;
         }
 
@@ -1146,7 +1150,7 @@ class tool_uploadcourse_course {
 
                     // Now update values.
                     // Sort out plugin specific fields.
-                    $modifiedinstance = $plugin->update_enrol_plugin_data($course->id, $method, $instance);
+                    $modifiedinstance = $plugin->update_enrol_plugin_data($course->id, $method, clone $instance);
                     $plugin->update_instance($instance, $modifiedinstance);
                 } else {
                     foreach ($errors as $key => $message) {

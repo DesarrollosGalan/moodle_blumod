@@ -143,32 +143,11 @@ class renderer extends \plugin_renderer_base {
     }
 
     /**
-     * Returns the html section for factor setup
-     *
-     * @param object $factor object of the factor class
-     * @return string
      * @deprecated since Moodle 4.4
-     * @todo Final deprecation in Moodle 4.8 MDL-80995
      */
-    public function setup_factor(object $factor): string {
-        debugging('The method setup_factor() has been deprecated. The HTML derived from this method is no longer needed.
-            Similar HTML is now achieved as part of available_factors().', DEBUG_DEVELOPER);
-        $html = '';
-
-        $html .= html_writer::start_tag('div', ['class' => 'card']);
-
-        $html .= html_writer::tag('h4', $factor->get_display_name(), ['class' => 'card-header']);
-        $html .= html_writer::start_tag('div', ['class' => 'card-body']);
-        $html .= $factor->get_info();
-
-        $setupparams = ['action' => 'setup', 'factor' => $factor->name, 'sesskey' => sesskey()];
-        $setupurl = new \moodle_url('action.php', $setupparams);
-        $html .= $this->output->single_button($setupurl, $factor->get_setup_string());
-        $html .= html_writer::end_tag('div');
-        $html .= html_writer::end_tag('div');
-        $html .= '<br>';
-
-        return $html;
+    #[\core\attribute\deprecated(null, reason: 'It is no longer used', since: '4.4', mdl: 'MDL-79920', final: true)]
+    public function setup_factor(): void {
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -195,7 +174,7 @@ class renderer extends \plugin_renderer_base {
 
         $table = new \html_table();
         $table->id = 'active_factors';
-        $table->attributes['class'] = 'generaltable table table-bordered';
+        $table->attributes['class'] = 'generaltable table table-bordered table-hover';
         $table->head  = [
             $headers->devicename,
             $headers->added,
@@ -369,7 +348,7 @@ class renderer extends \plugin_renderer_base {
         $table = new \html_table();
         $table->head = $displaynames;
         $table->align = $colclasses;
-        $table->attributes['class'] = 'generaltable table table-bordered w-auto';
+        $table->attributes['class'] = 'generaltable table table-bordered w-auto table-hover';
         $table->attributes['style'] = 'width: auto; min-width: 50%; margin-bottom: 0;';
 
         // Manually handle Total users and MFA users.
@@ -379,7 +358,7 @@ class renderer extends \plugin_renderer_base {
                         WHERE deleted = 0
                         AND suspended = 0
                     GROUP BY auth";
-        $allusersinfo = $DB->get_records_sql($alluserssql, []);
+        $allusersinfo = $DB->get_records_sql_menu($alluserssql);
 
         $noncompletesql = "SELECT u.auth, COUNT(u.id)
                              FROM {user} u
@@ -388,7 +367,7 @@ class renderer extends \plugin_renderer_base {
                               AND (mfaa.lastverified < ?
                                OR mfaa.lastverified IS NULL)
                          GROUP BY u.auth";
-        $noncompleteinfo = $DB->get_records_sql($noncompletesql, [$lookback, $lookback]);
+        $noncompleteinfo = $DB->get_records_sql_menu($noncompletesql, [$lookback, $lookback]);
 
         $nologinsql = "SELECT auth, COUNT(id)
                          FROM {user}
@@ -396,7 +375,7 @@ class renderer extends \plugin_renderer_base {
                           AND suspended = 0
                           AND lastlogin < ?
                      GROUP BY auth";
-        $nologininfo = $DB->get_records_sql($nologinsql, [$lookback]);
+        $nologininfo = $DB->get_records_sql_menu($nologinsql, [$lookback]);
 
         $mfauserssql = "SELECT auth,
                             COUNT(DISTINCT tm.userid)
@@ -406,7 +385,7 @@ class renderer extends \plugin_renderer_base {
                         AND u.deleted = 0
                         AND u.suspended = 0
                     GROUP BY u.auth";
-        $mfausersinfo = $DB->get_records_sql($mfauserssql, [$lookback]);
+        $mfausersinfo = $DB->get_records_sql_menu($mfauserssql, [$lookback]);
 
         $factorsusedsql = "SELECT CONCAT(u.auth, '_', tm.factor) as id,
                                 COUNT(*)
@@ -417,7 +396,7 @@ class renderer extends \plugin_renderer_base {
                             AND u.suspended = 0
                             AND (tm.revoked = 0 OR (tm.revoked = 1 AND tm.timemodified > ?))
                         GROUP BY CONCAT(u.auth, '_', tm.factor)";
-        $factorsusedinfo = $DB->get_records_sql($factorsusedsql, [$lookback, $lookback]);
+        $factorsusedinfo = $DB->get_records_sql_menu($factorsusedsql, [$lookback, $lookback]);
 
         // Auth rows.
         $authtypes = get_enabled_auth_plugins(true);
@@ -426,10 +405,10 @@ class renderer extends \plugin_renderer_base {
             $row[] = \html_writer::tag('b', $authtype);
 
             // Setup the overall totals columns.
-            $row[] = $allusersinfo[$authtype]->count ?? '-';
-            $row[] = $mfausersinfo[$authtype]->count ?? '-';
-            $row[] = $noncompleteinfo[$authtype]->count ?? '-';
-            $row[] = $nologininfo[$authtype]->count ?? '-';
+            $row[] = $allusersinfo[$authtype] ?? '-';
+            $row[] = $mfausersinfo[$authtype] ?? '-';
+            $row[] = $noncompleteinfo[$authtype] ?? '-';
+            $row[] = $nologininfo[$authtype] ?? '-';
 
             // Create a running counter for the total.
             $authtotal = 0;
@@ -439,7 +418,7 @@ class renderer extends \plugin_renderer_base {
                 if (!empty($column)) {
                     // Get the information from the data key.
                     $key = $authtype . '_' . $column;
-                    $count = $factorsusedinfo[$key]->count ?? 0;
+                    $count = $factorsusedinfo[$key] ?? 0;
                     $authtotal += $count;
 
                     $row[] = $count ? format_float($count, 0) : '-';
@@ -482,7 +461,7 @@ class renderer extends \plugin_renderer_base {
 
         $table = new \html_table();
 
-        $table->attributes['class'] = 'generaltable table table-bordered w-auto';
+        $table->attributes['class'] = 'generaltable table table-bordered w-auto table-hover';
         $table->attributes['style'] = 'width: auto; min-width: 50%';
 
         $table->head = [
@@ -534,7 +513,7 @@ class renderer extends \plugin_renderer_base {
         global $DB;
 
         $table = new \html_table();
-        $table->attributes['class'] = 'generaltable table table-bordered w-auto';
+        $table->attributes['class'] = 'generaltable table table-bordered w-auto table-hover';
         $table->attributes['style'] = 'width: auto; min-width: 50%';
         $table->head = [
             'userid' => get_string('userid', 'grades'),

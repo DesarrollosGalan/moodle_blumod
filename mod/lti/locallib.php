@@ -4356,18 +4356,26 @@ function lti_is_cartridge($url) {
     if (preg_match('/\.xml$/', $url)) {
         return true;
     }
-    // Even if it doesn't have .xml, load the url to check if it's a cartridge..
-    try {
-        $toolinfo = lti_load_cartridge($url,
-            array(
-                "launch_url" => "launchurl"
-            )
-        );
-        if (!empty($toolinfo['launchurl'])) {
-            return true;
+
+    // Skip slow cartridge checks during tests.
+    // During tests, working .xml cartridge URLs are used when testing cartridge support. These will match the '.xml' check
+    // above (which is fast). Don't try to check whether other tool URLs are cartridges because most URLs used in tests will be
+    // example URLs and won't be resolvable, resulting in network hangs within load_cartridge() - which is called every time a
+    // tool is edited and will result in slow tests or seemingly random test failures.
+    if (!defined('BEHAT_SITE_RUNNING') && !defined('PHPUNIT_TEST')) {
+        // Even if it doesn't have .xml, load the url to check if it's a cartridge..
+        try {
+            $toolinfo = lti_load_cartridge($url,
+                array(
+                    "launch_url" => "launchurl"
+                )
+            );
+            if (!empty($toolinfo['launchurl'])) {
+                return true;
+            }
+        } catch (moodle_exception $e) {
+            return false; // Error loading the xml, so it's not a cartridge.
         }
-    } catch (moodle_exception $e) {
-        return false; // Error loading the xml, so it's not a cartridge.
     }
     return false;
 }
@@ -4586,23 +4594,4 @@ function lti_new_access_token($typeid, $scopes) {
     $DB->insert_record('lti_access_tokens', $newtoken);
 
     return $newtoken;
-
-}
-
-
-/**
- * Wrapper for function libxml_disable_entity_loader() deprecated in PHP 8
- *
- * Method was deprecated in PHP 8 and it shows deprecation message. However it is still
- * required in the previous versions on PHP. While Moodle supports both PHP 7 and 8 we need to keep it.
- * @see https://php.watch/versions/8.0/libxml_disable_entity_loader-deprecation
- *
- * @param bool $value
- * @return bool
- *
- * @deprecated since Moodle 4.3
- */
-function lti_libxml_disable_entity_loader(bool $value): bool {
-    debugging(__FUNCTION__ . '() is deprecated, please do not use it any more', DEBUG_DEVELOPER);
-    return true;
 }

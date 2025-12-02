@@ -23,6 +23,7 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use core\output\notification;
 use mod_quiz\access_manager;
 use mod_quiz\output\list_of_attempts;
 use mod_quiz\output\renderer;
@@ -115,6 +116,7 @@ foreach (array_reverse($viewobj->attemptobjs) as $attemptobj) {
 }
 
 // Work out the final grade, checking whether it was overridden in the gradebook.
+// First, get an initial grade to display.
 if (!$canpreview) {
     $mygrade = quiz_get_best_grade($quiz, $USER->id);
 } else if ($lastfinishedattempt) {
@@ -125,6 +127,7 @@ if (!$canpreview) {
     $mygrade = null;
 }
 
+// Now, check the grade in the gradebook, if there is one.
 $mygradeoverridden = false;
 $gradebookfeedback = '';
 
@@ -136,25 +139,23 @@ $gradeitem = grade_item::fetch([
     'courseid' => $course->id,
 ]);
 
-if ($gradeitem) {
-    if ($gradeitem->refresh_grades($USER->id)) {
-        $grade = $gradeitem->get_grade($USER->id, false);
-        if ($grade->overridden) {
-            if ($gradeitem->needsupdate) {
-                // It is Error, but let's be consistent with the old code.
-                $mygrade = 0;
-            } else {
-                $mygrade = $grade->finalgrade;
-            }
-            $mygradeoverridden = true;
-        }
+// If there's a grade item grade, then get that grade for this user.
+// Users who can preview the quiz (eg teachers) won't have a proper grade,
+// so no point getting their grades here.
+if (!$canpreview && $gradeitem) {
+    $grade = $gradeitem->get_grade($USER->id, false);
+    $mygrade = $grade->finalgrade; // Use this grade to display in the view page.
 
-        if (!empty($grade->feedback)) {
-            $gradebookfeedback = $grade->feedback;
+    if ($grade->overridden) {
+        if ($gradeitem->needsupdate) {
+            // It is Error, but let's be consistent with the old code.
+            $mygrade = 0;
         }
-    } else {
-        // It is Error, but let's be consistent with the old code.
-        $mygrade = 0;
+        $mygradeoverridden = true;
+    }
+
+    if (!empty($grade->feedback)) {
+        $gradebookfeedback = $grade->feedback;
     }
 }
 
@@ -168,7 +169,7 @@ $PAGE->add_body_class('limitedwidth');
 /** @var renderer $output */
 $output = $PAGE->get_renderer('mod_quiz');
 
-// Print table with existing attempts.
+// Print overall stats and table with existing attempts.
 if ($attempts) {
     // Work out which columns we need, taking account what data is available in each attempt.
     list($someoptions, $alloptions) = quiz_get_combined_reviewoptions($quiz, $attempts);
@@ -261,6 +262,13 @@ if (!$viewobj->quizhasquestions) {
             }
         }
     }
+
+    // If the quiz has any invalid questions, we cannot attempt it.
+    if (in_array('missingtype', $quizobj->get_all_question_types_used())) {
+        $viewobj->preventmessages[] = $OUTPUT->notification(
+            get_string('quizinvalidquestions', 'mod_quiz'), notification::NOTIFY_ERROR, false);
+        $viewobj->buttontext = '';
+    }
 }
 
 $viewobj->showbacktocourse = ($viewobj->buttontext === '' &&
@@ -270,7 +278,7 @@ echo $OUTPUT->header();
 
 if (!empty($gradinginfo->errors)) {
     foreach ($gradinginfo->errors as $error) {
-        $errortext = new \core\output\notification($error, \core\output\notification::NOTIFY_ERROR);
+        $errortext = new notification($error, notification::NOTIFY_ERROR);
         echo $OUTPUT->render($errortext);
     }
 }

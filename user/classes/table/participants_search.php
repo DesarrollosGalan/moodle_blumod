@@ -140,7 +140,7 @@ class participants_search {
     )]
     public function get_total_participants_count(string $additionalwhere = '', array $additionalparams = []): int {
 
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
 
         global $DB;
 
@@ -330,8 +330,8 @@ class participants_search {
                     $wheresjoin = ' AND NOT ';
 
                     // Some of the $where conditions may begin with `NOT` which results in `AND NOT NOT ...`.
-                    // To prevent this from breaking on Oracle the inner WHERE clause is wrapped in brackets, making it
-                    // `AND NOT (NOT ...)` which is valid in all DBs.
+                    // To ensure consistent SQL syntax across databases, the inner WHERE clause is wrapped in brackets,
+                    // making it `AND NOT (NOT ...)`, which is valid and improves readability.
                     $wheres = array_map(function($where) {
                         return "({$where})";
                     }, $wheres);

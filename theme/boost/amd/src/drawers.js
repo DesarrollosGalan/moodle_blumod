@@ -28,8 +28,8 @@ import {debounce} from 'core/utils';
 import {isSmall, isLarge} from 'core/pagehelpers';
 import Pending from 'core/pending';
 import {setUserPreference} from 'core_user/repository';
-// The jQuery module is only used for interacting with Boostrap 4. It can we removed when MDL-71979 is integrated.
-import jQuery from 'jquery';
+import Tooltip from './bootstrap/tooltip';
+import * as FocusLock from 'core/local/aria/focuslock';
 
 let backdropPromise = null;
 
@@ -142,12 +142,11 @@ const disableDrawerTooltips = (drawerNode) => {
  */
 const disableButtonTooltip = (button, enableOnBlur) => {
     if (button.hasAttribute('data-original-title')) {
-        // The jQuery is still used in Boostrap 4. It can we removed when MDL-71979 is integrated.
-        jQuery(button).tooltip('disable');
+        Tooltip.getInstance(button).disable();
         button.setAttribute('title', button.dataset.originalTitle);
     } else {
         button.dataset.disabledToggle = button.dataset.toggle;
-        button.removeAttribute('data-toggle');
+        button.removeAttribute('data-bs-toggle');
     }
     if (enableOnBlur) {
         button.dataset.restoreTooltipOnBlur = true;
@@ -180,13 +179,12 @@ const enableDrawerTooltips = (drawerNode) => {
  * @private
  */
 const enableButtonTooltip = (button) => {
-    // The jQuery is still used in Boostrap 4. It can we removed when MDL-71979 is integrated.
-    if (button.hasAttribute('data-original-title')) {
-        jQuery(button).tooltip('enable');
+    if (button.hasAttribute('data-bs-original-title')) {
+        Tooltip.getInstance(button).enable();
         button.removeAttribute('title');
     } else if (button.dataset.disabledToggle) {
         button.dataset.toggle = button.dataset.disabledToggle;
-        jQuery(button).tooltip();
+        new Tooltip(button);
     }
     delete button.dataset.restoreTooltipOnBlur;
 };
@@ -432,8 +430,7 @@ export default class Drawers {
         // Remove open tooltip if still visible.
         let openButton = getDrawerOpenButton(this.drawerNode.id);
         if (openButton && openButton.hasAttribute('data-original-title')) {
-            // The jQuery is still used in Boostrap 4. It can we removed when MDL-71979 is integrated.
-            jQuery(openButton)?.tooltip('hide');
+            Tooltip.getInstance(openButton)?.hide();
         }
 
         Aria.unhide(this.drawerNode);
@@ -460,7 +457,9 @@ export default class Drawers {
                 pageWrapper.style.overflow = 'hidden';
                 return backdrop;
             })
-            .catch();
+            .catch(() => {
+                return;
+            });
         }
 
         // Show close button and header content once the drawer is fully opened.
@@ -475,6 +474,11 @@ export default class Drawers {
             if (focusOnCloseButton) {
                 closeButton.focus();
             }
+            // On small devices, the drawer must have a trap focus once the focus is inside
+            // to prevent the user from focussing on covered elements.
+            if (isSmall()) {
+                FocusLock.trapFocus(this.drawerNode);
+            }
             pendingPromise.resolve();
         }, 300);
 
@@ -488,7 +492,7 @@ export default class Drawers {
      * @param {boolean} [args.focusOnOpenButton=true] Whether to alter page focus when opening the drawer
      * @param {boolean} [args.updatePreferences=true] Whether to update the user prewference
      */
-    closeDrawer({focusOnOpenButton = true, updatePreferences = true} = {}) {
+        closeDrawer({focusOnOpenButton = true, updatePreferences = true} = {}) {
 
         const pendingPromise = new Pending('theme_boost/drawers:close');
 
@@ -504,8 +508,7 @@ export default class Drawers {
         headerContent?.classList.toggle('hidden', true);
         // Remove the close button tooltip if visible.
         if (closeButton.hasAttribute('data-original-title')) {
-            // The jQuery is still used in Boostrap 4. It can we removed when MDL-71979 is integrated.
-            jQuery(closeButton)?.tooltip('hide');
+            Tooltip.getInstance(closeButton)?.hide();
         }
 
         const preference = this.drawerNode.dataset.preference;
@@ -531,8 +534,13 @@ export default class Drawers {
             }
             return backdrop;
         })
-        .catch();
+        .catch(() => {
+                return;
+        });
 
+        if (isSmall()) {
+            FocusLock.untrapFocus();
+        }
         // Move focus to the open drawer (or toggler) button once the drawer is hidden.
         let openButton = getDrawerOpenButton(this.drawerNode.id);
         if (openButton) {

@@ -1907,8 +1907,6 @@ final class externallib_test extends externallib_advanced_testcase {
         list($course, $forumcm, $datacm, $pagecm, $labelcm, $urlcm) = $this->prepare_get_course_contents_test();
 
         // Add subsection.
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
         $modsubsection = $this->getDataGenerator()->create_module('subsection', ['course' => $course->id, 'section' => 2]);
 
         // This is needed until MDL-76728 is resolved.
@@ -2849,7 +2847,7 @@ final class externallib_test extends externallib_advanced_testcase {
             foreach ($course['options'] as $option) {
                 $navoptions->{$option['name']} = $option['available'];
             }
-            $this->assertCount(9, $course['options']);
+            $this->assertCount(10, $course['options']);
             if ($course['id'] == SITEID) {
                 $this->assertTrue($navoptions->blogs);
                 $this->assertFalse($navoptions->notes);
@@ -2860,6 +2858,7 @@ final class externallib_test extends externallib_advanced_testcase {
                 $this->assertFalse($navoptions->search);
                 $this->assertTrue($navoptions->competencies);
                 $this->assertFalse($navoptions->communication);
+                $this->assertFalse($navoptions->overview);
             } else {
                 $this->assertTrue($navoptions->blogs);
                 $this->assertFalse($navoptions->notes);
@@ -2870,6 +2869,7 @@ final class externallib_test extends externallib_advanced_testcase {
                 $this->assertFalse($navoptions->search);
                 $this->assertTrue($navoptions->competencies);
                 $this->assertFalse($navoptions->communication);
+                $this->assertTrue($navoptions->overview);
             }
         }
     }
@@ -3964,6 +3964,12 @@ final class externallib_test extends externallib_advanced_testcase {
         $this->assignUserCapability('moodle/user:viewdetails', $usercontext, $teacherroleid);
 
         // Sorted by course id DESC.
+        // User without moodle/user:viewalldetails capability will not be able to see the course details.
+        $result = core_course_external::get_recent_courses($student->id);
+        $this->assertCount(0, $result);
+
+        // User with moodle/user:viewalldetails capability will be able to see the course details.
+        $this->assignUserCapability('moodle/user:viewalldetails', $usercontext, $teacherroleid);
         $result = core_course_external::get_recent_courses($student->id);
         $this->assertCount(1, $result);
         $this->assertEquals($courses[0]->id, array_shift($result)->id);
@@ -4067,6 +4073,12 @@ final class externallib_test extends externallib_advanced_testcase {
 
         $this->assertEquals(2, count($users['users']));
         $this->assertEquals($expectedusers, $users);
+
+        // Prohibit the capability for viewing course participants.
+        $this->unassignUserCapability('moodle/course:viewparticipants', null, null, $course1->id);
+        $this->expectException(required_capability_exception::class);
+        $this->expectExceptionMessage('Sorry, but you do not currently have permissions to do that (View participants)');
+        core_course_external::get_enrolled_users_by_cmid($forum1->cmid);
     }
 
     /**

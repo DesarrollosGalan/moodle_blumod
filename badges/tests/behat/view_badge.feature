@@ -16,7 +16,6 @@ Feature: Display badges
       | language       | ca                               |
       | description    | Testing system badge description |
       | image          | badges/tests/behat/badge.png     |
-      | imageauthorurl | http://author.example.com        |
       | imagecaption   | My caption image                 |
     And the following "core_badges > Criterias" exist:
       | badge                | role           |
@@ -24,6 +23,7 @@ Feature: Display badges
     And I log in as "admin"
     And I navigate to "Badges > Manage badges" in site administration
 
+  @accessibility
   Scenario: Display badge without expired date
     # Enable the badge.
     Given I press "Enable access" action in the "Testing system badge" report row
@@ -44,6 +44,7 @@ Feature: Display badges
     And I follow "More details"
     And I should see "Catalan"
     And I should see "1.1"
+    And the page should meet accessibility standards with "best-practice" extra tests
 
   Scenario: Display badge with ALL criteria
     # Add another criterion and enable the badge.
@@ -101,7 +102,7 @@ Feature: Display badges
     # Set expired date to badge (future date).
     Given I press "Edit" action in the "Testing system badge" report row
     And I expand all fieldsets
-    When I click on "Relative date" "radio"
+    When I click on "Relative date: this badge expires after a period of time:" "radio"
     And I set the field "expireperiod[number]" to "1"
     And I press "Save changes"
     And I should see "Changes saved"
@@ -125,7 +126,7 @@ Feature: Display badges
     # Set expired date to badge (relative date 1 seconds after the date of issue it).
     Given I press "Edit" action in the "Testing system badge" report row
     And I expand all fieldsets
-    When I click on "Relative date" "radio"
+    When I click on "Relative date: this badge expires after a period of time:" "radio"
     And I set the field "expireperiod[timeunit]" to "1"
     And I set the field "expireperiod[number]" to "1"
     And I press "Save changes"

@@ -47,6 +47,9 @@ class attempt_summary_information implements renderable, named_templatable {
     /** @var array[] The rows of summary data. {@see add_item()} should make the structure clear. */
     protected array $summarydata = [];
 
+    /** @var string The caption for attempt summary table. */
+    protected string $caption = '';
+
     /**
      * Add an item to the summary.
      *
@@ -59,6 +62,15 @@ class attempt_summary_information implements renderable, named_templatable {
             'title'   => $title,
             'content' => $content,
         ];
+    }
+
+    /**
+     * Set the caption for the summary table.
+     *
+     * @param string $caption
+     */
+    public function set_caption(string $caption): void {
+        $this->caption = $caption;
     }
 
     /**
@@ -209,6 +221,9 @@ class attempt_summary_information implements renderable, named_templatable {
             }
         }
 
+        // Caption.
+        $summary->set_caption(get_string('summaryofattemptscaption', 'quiz', $attemptobj->get_attempt_number()));
+
         // Attempt state.
         $summary->add_item('state', get_string('attemptstate', 'quiz'),
             quiz_attempt::state_name($attemptobj->get_attempt()->state));
@@ -295,7 +310,10 @@ class attempt_summary_information implements renderable, named_templatable {
 
         // Grades for extra grade items, if any.
         foreach ($attemptobj->get_grade_item_totals() as $gradeitemid => $gradeoutof) {
-            $this->add_item('marks' . $gradeitemid, format_string($gradeoutof->name), $gradeoutof);
+            $this->add_item('marks' . $gradeitemid, format_string($gradeoutof->name),
+                new grade_out_of($quiz, $gradeoutof->grade, $gradeoutof->maxgrade,
+                    style: abs($gradeoutof->maxgrade - 100) < grade_calculator::ALMOST_ZERO ?
+                        grade_out_of::NORMAL : grade_out_of::WITH_PERCENT));
         }
 
         // Show raw marks only if they are different from the grade.
@@ -318,6 +336,7 @@ class attempt_summary_information implements renderable, named_templatable {
         $templatecontext = [
             'hasitems' => !empty($this->summarydata),
             'items' => [],
+            'caption' => $this->caption,
         ];
         foreach ($this->summarydata as $item) {
             if ($item['title'] instanceof renderable) {

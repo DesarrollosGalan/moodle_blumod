@@ -20,9 +20,9 @@ Feature: I can apply presets
     And I navigate to "Plugins > Course formats > Manage course formats" in site administration
     And "Disable" "icon" should exist in the "Social" "table_row"
     And I navigate to "Plugins > Question behaviours > Manage question behaviours" in site administration
-    And "Enabled" "icon" should exist in the "Immediate feedback with CBM" "table_row"
+    And "Enabled" "link" should exist in the "Immediate feedback with CBM" "table_row"
     And I navigate to "Plugins > Question types > Manage question types" in site administration
-    And "Enabled" "icon" should exist in the "Calculated multichoice" "table_row"
+    And "Enabled" "link" should exist in the "Calculated multichoice" "table_row"
     When I navigate to "Site admin presets" in site administration
     And I press "Review settings and apply" action in the "Starter" report row
     And I should see "Setting changes"
@@ -30,7 +30,6 @@ Feature: I can apply presets
     And I should see "Activities" in the "Setting changes" "table"
     And I should see "Activity chooser tabs" in the "Setting changes" "table"
     And I should see "Adaptive mode (no penalties)" in the "Setting changes" "table"
-    And I should see "Analytics" in the "Setting changes" "table"
     And I should see "Blog menu" in the "Setting changes" "table"
     And I should see "Blog tags" in the "Setting changes" "table"
     And I should see "Calculated" in the "Setting changes" "table"
@@ -73,7 +72,6 @@ Feature: I can apply presets
     And "Maximum number of attachments" row "Current value" column of "Setting changes" table should contain "9"
     And "Maximum number of attachments" row "New value" column of "Setting changes" table should contain "3"
     And I should see "Mentees" in the "Setting changes" "table"
-    And I should see "Network servers" in the "Setting changes" "table"
     And I should see "Numerical" in the "Setting changes" "table"
     And I should see "Online users" in the "Setting changes" "table"
     And I should see "Private files" in the "Setting changes" "table"
@@ -113,9 +111,9 @@ Feature: I can apply presets
     And I navigate to "Plugins > Course formats > Manage course formats" in site administration
     And "Disable" "icon" should not exist in the "Social" "table_row"
     And I navigate to "Plugins > Question behaviours > Manage question behaviours" in site administration
-    And "Enabled" "icon" should not exist in the "Immediate feedback with CBM" "table_row"
+    And "Enabled" "link" should not exist in the "Immediate feedback with CBM" "table_row"
     And I navigate to "Plugins > Question types > Manage question types" in site administration
-    And "Enabled" "icon" should not exist in the "Calculated multichoice" "table_row"
+    And "Enabled" "link" should not exist in the "Calculated multichoice" "table_row"
 
   Scenario: Re-applying Starter Moodle preset does not display setting changes
 #   Apply Starter preset.

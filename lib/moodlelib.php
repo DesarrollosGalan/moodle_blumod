@@ -408,6 +408,8 @@ define ('PEPPER_ENTROPY', 112);
 
 /** True if module can provide a grade */
 define('FEATURE_GRADE_HAS_GRADE', 'grade_has_grade');
+/** True if module can support grade penalty */
+define('FEATURE_GRADE_HAS_PENALTY', 'grade_has_penalty');
 /** True if module supports outcomes */
 define('FEATURE_GRADE_OUTCOMES', 'outcomes');
 /** True if module supports advanced grading methods */
@@ -450,6 +452,15 @@ define('FEATURE_COMMENT', 'comment');
 define('FEATURE_RATE', 'rate');
 /** True if module supports backup/restore of moodle2 format */
 define('FEATURE_BACKUP_MOODLE2', 'backup_moodle2');
+
+/** True if module shares questions with other modules. */
+define('FEATURE_PUBLISHES_QUESTIONS', 'publishesquestions');
+
+/** Used by {@see course_modinfo::is_mod_type_visible_on_course()} to determine if a plugin should render to display */
+define('FEATURE_CAN_DISPLAY', 'candisplay');
+
+/** Can this module type be uninstalled */
+define('FEATURE_CAN_UNINSTALL', 'canuninstall');
 
 /** True if module can show description on course main page */
 define('FEATURE_SHOW_DESCRIPTION', 'showdescription');
@@ -921,14 +932,23 @@ function html_is_blank($string) {
  * @param string|int|bool|null $value the value to set (without magic quotes),
  *               null to unset the value
  * @param string $plugin (optional) the plugin scope, default null
+ * @param boolean $log (optional) should this emit to the config log
  * @return bool true or exception
  */
-function set_config($name, $value, $plugin = null) {
+function set_config($name, $value, $plugin = null, bool $log = false) {
     global $CFG, $DB;
 
     // Redirect to appropriate handler when value is null.
     if ($value === null) {
-        return unset_config($name, $plugin);
+        return unset_config($name, $plugin, $log);
+    }
+
+    if ($log) {
+        $prev = get_config($plugin, $name);
+        if ($prev === false) {
+            $prev = null;
+        }
+        add_to_config_log($name, $prev, $value, $plugin);
     }
 
     // Set variables determining conditions and where to store the new config.
@@ -1086,10 +1106,19 @@ function get_config($plugin, $name = null) {
  *
  * @param string $name the key to set
  * @param string $plugin (optional) the plugin scope
+ * @param boolean $log (optional) should this emit to the config log
  * @return boolean whether the operation succeeded.
  */
-function unset_config($name, $plugin=null) {
+function unset_config($name, $plugin = null, bool $log = false) {
     global $CFG, $DB;
+
+    if ($log) {
+        $prev = get_config($plugin, $name);
+        if ($prev === false) {
+            $prev = null;
+        }
+        add_to_config_log($name, $prev, null, $plugin);
+    }
 
     if (empty($plugin)) {
         unset($CFG->$name);
@@ -1185,10 +1214,11 @@ function purge_all_caches() {
  *
  * @param bool[] $options Specific parts of the cache to purge. Valid options are:
  *        'muc'    Purge MUC caches?
- *        'courses' Purge all course caches, or specific course caches (CLI only)
+ *        'courses' Purge all course caches, or specific course caches
  *        'theme'  Purge theme cache?
  *        'lang'   Purge language string cache?
  *        'js'     Purge javascript cache?
+ *        'template' Purge template cache
  *        'filter' Purge text filter cache?
  *        'other'  Purge all other caches?
  */
@@ -1490,11 +1520,7 @@ function set_user_preference($name, $value, $user = null) {
     } else if (is_array($value)) {
         throw new coding_exception('Invalid value in set_user_preference() call, arrays are not allowed');
     }
-    // Value column maximum length is 1333 characters.
     $value = (string)$value;
-    if (core_text::strlen($value) > 1333) {
-        throw new coding_exception('Invalid value in set_user_preference() call, value is is too long for the value column');
-    }
 
     if (is_null($user)) {
         $user = $USER;
@@ -1514,19 +1540,30 @@ function set_user_preference($name, $value, $user = null) {
         return true;
     }
 
-    if ($preference = $DB->get_record('user_preferences', array('userid' => $user->id, 'name' => $name))) {
-        if ($preference->value === $value and isset($user->preference[$name]) and $user->preference[$name] === $value) {
-            // Preference already set to this value.
-            return true;
-        }
-        $DB->set_field('user_preferences', 'value', $value, array('id' => $preference->id));
+    $retry = 0;
+    $saved = false;
 
-    } else {
-        $preference = new stdClass();
-        $preference->userid = $user->id;
-        $preference->name   = $name;
-        $preference->value  = $value;
-        $DB->insert_record('user_preferences', $preference);
+    while (!$saved && $retry++ < 2) {
+        if ($preference = $DB->get_record('user_preferences', ['userid' => $user->id, 'name' => $name])) {
+            if ($preference->value === $value && isset($user->preference[$name]) && $user->preference[$name] === $value) {
+                // Preference already set to this value.
+                return true;
+            }
+            $DB->set_field('user_preferences', 'value', $value, ['id' => $preference->id]);
+            $saved = true;
+        } else {
+            $preference = new stdClass();
+            $preference->userid = $user->id;
+            $preference->name   = $name;
+            $preference->value  = $value;
+            try {
+                $DB->insert_record('user_preferences', $preference);
+                $saved = true;
+            } catch (dml_write_exception $e) {
+                // We have an insert race, so just ignore and try again.
+                $saved = false;
+            }
+        }
     }
 
     // Update value in cache.
@@ -4729,11 +4766,12 @@ function delete_course($courseorid, $showfeedback = true) {
  * @param int $courseid The id of the course that is being deleted
  * @param bool $showfeedback Whether to display notifications of each action the function performs.
  * @param array $options extra options
+ * @param bool $coursedeletion Are we calling this as part of deleting the course?
  * @return bool true if all the removals succeeded. false if there were any failures. If this
  *             method returns false, some of the removals will probably have succeeded, and others
  *             failed, but you have no way of knowing which.
  */
-function remove_course_contents($courseid, $showfeedback = true, ?array $options = null) {
+function remove_course_contents($courseid, $showfeedback = true, ?array $options = null, bool $coursedeletion = true) {
     global $CFG, $DB, $OUTPUT;
 
     require_once($CFG->libdir.'/badgeslib.php');
@@ -4792,6 +4830,11 @@ function remove_course_contents($courseid, $showfeedback = true, ?array $options
     // Delete every instance of every module,
     // this has to be done before deleting of course level stuff.
     $locations = core_component::get_plugin_list('mod');
+    // Sort mod instances that publish questions to the end of the list, so that they will be removed last.
+    // This is because they could have questions in use by other activities in this course.
+    uksort($locations, static function ($a, $b) {
+        return plugin_supports('mod', $a, FEATURE_PUBLISHES_QUESTIONS) <=> plugin_supports('mod', $b, FEATURE_PUBLISHES_QUESTIONS);
+    });
     foreach ($locations as $modname => $moddir) {
         if ($modname === 'NEWMODULE') {
             continue;
@@ -4809,16 +4852,8 @@ function remove_course_contents($courseid, $showfeedback = true, ?array $options
 
             if ($instances) {
                 foreach ($instances as $cm) {
-                    if ($cm->id) {
-                        // Delete activity context questions and question categories.
-                        question_delete_activity($cm);
-                        // Notify the competency subsystem.
-                        \core_competency\api::hook_course_module_deleted($cm);
-
-                        // Delete all tag instances associated with the instance of this module.
-                        core_tag_tag::delete_instances("mod_{$modname}", null, context_module::instance($cm->id)->id);
-                        core_tag_tag::remove_all_item_tags('core', 'course_modules', $cm->id);
-                    }
+                    // Warning! there is very similar code in course_delete_module.
+                    // If you are changing this code, you probably need to change that too.
                     if (function_exists($moddelete)) {
                         // This purges all module data in related tables, extra user prefs, settings, etc.
                         $moddelete($cm->modinstance);
@@ -4829,6 +4864,16 @@ function remove_course_contents($courseid, $showfeedback = true, ?array $options
                     }
 
                     if ($cm->id) {
+                        // Delete activity context questions and question categories.
+                        // We delete the questions after the activity database is removed,
+                        // because questions are referenced via question reference tables
+                        // and cannot be deleted while the activities that use them still exist.
+                        question_delete_activity($cm, coursedeletion: $coursedeletion);
+                        // Delete all tag instances associated with the instance of this module.
+                        core_tag_tag::delete_instances("mod_{$modname}", null, context_module::instance($cm->id)->id);
+                        core_tag_tag::remove_all_item_tags('core', 'course_modules', $cm->id);
+                        // Notify the competency subsystem.
+                        \core_competency\api::hook_course_module_deleted($cm);
                         // Delete cm and its context - orphaned contexts are purged in cron in case of any race condition.
                         context_helper::delete_instance(CONTEXT_MODULE, $cm->id);
                         $DB->delete_records('course_modules_completion', ['coursemoduleid' => $cm->id]);
@@ -4877,12 +4922,6 @@ function remove_course_contents($courseid, $showfeedback = true, ?array $options
 
     if ($showfeedback) {
         echo $OUTPUT->notification($strdeleted.get_string('type_mod_plural', 'plugin'), 'notifysuccess');
-    }
-
-    // Delete questions and question categories.
-    question_delete_course($course);
-    if ($showfeedback) {
-        echo $OUTPUT->notification($strdeleted.get_string('questions', 'question'), 'notifysuccess');
     }
 
     // Delete content bank contents.
@@ -5321,7 +5360,7 @@ function reset_course_userdata($data) {
     if (!empty($data->reset_gradebook_items)) {
         remove_course_grades($data->courseid, false);
         grade_grab_course_grades($data->courseid);
-        grade_regrade_final_grades($data->courseid);
+        grade_regrade_final_grades($data->courseid, async: true);
         $status[] = array('component' => $componentstr, 'item' => get_string('removeallcourseitems', 'grades'), 'error' => false);
 
     } else if (!empty($data->reset_gradebook_grades)) {
@@ -5352,35 +5391,6 @@ function generate_email_processing_address($modid, $modargs) {
 
     $header = $CFG->mailprefix . substr(base64_encode(pack('C', $modid)), 0, 2).$modargs;
     return $header . substr(md5($header.get_site_identifier()), 0, 16).'@'.$CFG->maildomain;
-}
-
-/**
- * ?
- *
- * @todo Finish documenting this function
- *
- * @param string $modargs
- * @param string $body Currently unused
- */
-function moodle_process_email($modargs, $body) {
-    global $DB;
-
-    // The first char should be an unencoded letter. We'll take this as an action.
-    switch ($modargs[0]) {
-        case 'B': { // Bounce.
-            list(, $userid) = unpack('V', base64_decode(substr($modargs, 1, 8)));
-            if ($user = $DB->get_record("user", array('id' => $userid), "id,email")) {
-                // Check the half md5 of their email.
-                $md5check = substr(md5($user->email), 0, 16);
-                if ($md5check == substr($modargs, -16)) {
-                    set_bounce_count($user);
-                }
-                // Else maybe they've already changed it?
-            }
-        }
-        break;
-        // Maybe more later?
-    }
 }
 
 // CORRESPONDENCE.
@@ -5885,7 +5895,12 @@ function email_to_user($user, $from, $subject, $messagetext, $messagehtml = '', 
                 $attachment = $CFG->dataroot . '/' . $attachment;
             }
 
-            $mail->addAttachment($attachment, $attachname, 'base64', $mimetype);
+            if ($mimetype == 'text/calendar') {
+                $icalcontent = file_get_contents($attachment);
+                $mail->Ical = $icalcontent;
+            } else {
+                $mail->addAttachment($attachment, $attachname, 'base64', $mimetype);
+            }
         }
     }
 
@@ -6007,7 +6022,7 @@ function generate_email_signoff() {
         $signoff .= $CFG->supportname."\n";
     }
 
-    $supportemail = $OUTPUT->supportemail(['class' => 'font-weight-bold']);
+    $supportemail = $OUTPUT->supportemail(['class' => 'fw-bold']);
 
     if ($supportemail) {
         $signoff .= "\n" . $supportemail . "\n";
@@ -7492,6 +7507,11 @@ function component_callback_exists($component, $function) {
     list($type, $name) = core_component::normalize_component($component);
     $component = $type . '_' . $name;
 
+    // Deprecated plugin type: callbacks not supported.
+    if (\core_component::is_plugintype_in_deprecation($type)) {
+        return false;
+    }
+
     $oldfunction = $name.'_'.$function;
     $function = $component.'_'.$function;
 
@@ -7538,6 +7558,15 @@ function component_class_callback($classname, $methodname, array $params, $defau
 
     if (!method_exists($classname, $methodname)) {
         return $default;
+    }
+
+    // If component can be found (flat class names not supported), and it's a deprecated plugintype, callbacks are unsupported.
+    $component = \core_component::get_component_from_classname($classname);
+    if ($component) {
+        [$type] = \core_component::normalize_component($component);
+        if (\core_component::is_plugintype_in_deprecation($type)) {
+            return $default;
+        }
     }
 
     $fullfunction = $classname . '::' . $methodname;
@@ -9042,10 +9071,10 @@ function get_performance_info() {
     $info['html'] .= '<li class="dbqueries col-sm-4">DB reads/writes: '.$info['dbqueries'].'</li> ';
     $info['txt'] .= 'db reads/writes: '.$info['dbqueries'].' ';
 
-    if ($DB->want_read_slave()) {
-        $info['dbreads_slave'] = $DB->perf_get_reads_slave();
-        $info['html'] .= '<li class="dbqueries col-sm-4">DB reads from slave: '.$info['dbreads_slave'].'</li> ';
-        $info['txt'] .= 'db reads from slave: '.$info['dbreads_slave'].' ';
+    if ($DB->want_read_replica()) {
+        $info['dbreads_replica'] = $DB->perf_get_reads_replica();
+        $info['html'] .= '<li class="dbqueries col-sm-4">DB reads from replica: '.$info['dbreads_replica'].'</li> ';
+        $info['txt'] .= 'db reads from replica: '.$info['dbreads_replica'].' ';
     }
 
     $info['dbtime'] = round($DB->perf_get_queries_time(), 5);

@@ -32,6 +32,7 @@ Feature: Set up and manage user factors
     And I click on "Cancel" "button"
     And I click on "Manage security key" "button"
     And I should see "Manage security key"
+    And I should see "Add security key"
 
   @javascript
   Scenario: I can revoke a factor only when there is more than one active factor
@@ -48,6 +49,8 @@ Feature: Set up and manage user factors
     And the following config values are set as admin:
       | enabled | 1 | factor_sms     |
       | smsgateway | Dummy gateway (AWS) | factor_sms     |
+    And the following config values are set as admin:
+      | enabled | 0 | factor_email |
     And the following "tool_mfa > User factors" exist:
     | username | factor   | label                |
     | admin    | sms      | +409111222           |
@@ -57,7 +60,7 @@ Feature: Set up and manage user factors
     And I click on "Manage SMS" "button"
     And I click on "Remove" "button" in the "+409111222" "table_row"
     When I click on "Yes, remove" "button" in the "Remove '+409111222' SMS?" "dialogue"
-    Then I should see "'SMS mobile phone - +409111222' successfully removed"
+    Then I should see "'SMS - +409111222' successfully removed"
     # Now there is only one active factor left.
     And I click on "Manage security key" "button"
     And I should see "Replace" in the "MacBook" "table_row"
@@ -76,3 +79,15 @@ Feature: Set up and manage user factors
     And I click on "Replace" "button" in the "MacBook" "table_row"
     When I click on "Yes, replace" "button" in the "Replace 'MacBook' security key?" "dialogue"
     Then I should see "Replace security key"
+
+  Scenario: I can add a new factor instance on the manage factor page
+    Given the following config values are set as admin:
+      | enabled | 1 | factor_webauthn |
+    And the following "tool_mfa > User factors" exist:
+      | username | factor   | label    |
+      | admin    | webauthn | MacBook  |
+    And I follow "Preferences" in the user menu
+    And I click on "Multi-factor authentication preferences" "link"
+    And I click on "Manage security key" "button"
+    When I click on "Add security key" "button"
+    Then I should see "Set up security key"

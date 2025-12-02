@@ -25,55 +25,62 @@
 
  // use core\report_helper;
 
+ xdebug_break();
+
 require('../../config.php');
-require_once $CFG->dirroot . '/blocks/blumod/lib.php';
-require_once $CFG->dirroot . '/blocks/blumod/classes/reportcourse.php';
-require_once $CFG->libdir . '/tablelib.php';
-// require_once $CFG->libdir . '/csvlib.class.php';
+require_once $CFG->dirroot.'/blocks/blumod/lib.php';
+require_once $CFG->dirroot.'/blocks/blumod/classes/reportcourse.php';
+require_once $CFG->libdir.'/tablelib.php';
 
-
-define('DEFAULT_PAGE_SIZE', 25);
-// xdebug_break();
+ define('DEFAULT_PAGE_SIZE', 20);
+ define('SHOW_ALL_PAGE_SIZE', 5000);
 
 global $DB, $CFG, $PAGE;
-\core\session\manager::write_close();
 
-$pluginname = get_string('reportblumod', 'block_blumod');
 
 $courseid = required_param('courseid', PARAM_INT);
+// $id       = required_param('id', PARAM_INT); // course id.
 $course = $DB->get_record('course', ['id'=>$courseid], '*', MUST_EXIST);
-$baseurl = new moodle_url('/blocks/blumod/reportcourse.php', array(
+$url = new moodle_url('/block/blumod/reportcourse.php', array(
     'courseid' => $course->id));
-
-$PAGE->set_url($baseurl);
+$PAGE->set_url($url);
 $PAGE->set_pagelayout('admin');
-$PAGE->set_course($course);
-$title2 = get_string('blumod', 'block_blumod');
-$context = context_course::instance($course->id);
-$PAGE->set_context($context);
-$PAGE->set_title(format_string($course->shortname, true, array('context' => $context)) .': '. $title2);
-$PAGE->set_heading(format_string($course->fullname, true, array('context' => $context)) .': '. $title2);
-// $PAGE->set_pagelayout('standard');
 require_login($course);
-require_capability('block/blumod:manageblus', $context);
-
-$select = groups_allgroups_course_menu($course, $baseurl, true, $currentgroup);
+$context = context_course::instance($course->id);
 
 $reportcourse = new reportcourse_selector($courseid, null);
-$data = $reportcourse->loadData();
-$number_of_records = count($data);
+$PAGE->set_context($context);
+
+require_capability('block/blumod:manageblus', $context);
+$title2 = get_string('blumod', 'block_blumod');
+// navigation_node::override_active_url($url);
+
+$PAGE->set_title(format_string($course->shortname, true, array('context' => $context)) .': '. $title2);
+$PAGE->set_heading(format_string($course->fullname, true, array('context' => $context)) .': '. $title2);
+echo $OUTPUT->header();
+$PAGE->set_pagelayout('standard');
+
+$pluginname = get_string('reportblumod', 'block_blumod');
+// report_helper::print_report_selector($pluginname);
+// Release session lock.
+\core\session\manager::write_close();
+
+// $reporttable = report_blumod_get_table_name(); // Log table to use for fetaching records.
+
+$baseurl = new moodle_url('/block/blumod/reportcourse.php', array(
+    'courseid' => $course->id
+));
+$select = groups_allgroups_course_menu($course, $baseurl, true, $currentgroup);
 
 $table = new flexible_table('blumod-report-'.$course->id);
 $table->course = $course;
 
-$table->initialbars(true);
-
-$table->define_columns(array('bluid', 'bluname', 'blumodid', 'blumodmodule', 'cmmodule', 'cminstance', 'resourcename', 'competencyid', 'competencyshortname'));
-$table->define_headers(array('BLUID', 'BLU', 'BLUMODID', 'BLUMODMODULE', 'CMMODULE', 'CMINSTANCE', 'RESOURCENAME', 'COMPETENCYID', 'COMPETENCY'));
+$table->define_columns(array('bluid', 'bluname', 'blumodid', 'blumodmodule', 'cmmodule', 'cminstance', 'resource_name', 'competencyid', 'competencyshortname'));
+$table->define_headers(array('BLUID', 'BLU', 'BLUMODID', 'BLUMODMODULE', 'CMMODULE', 'CMINSTANCE', 'RESOURCE_NAME', 'COMPETENCYID', 'COMPETENCY'));
 $table->define_baseurl($baseurl);
-$table->sortable(true);
 $table->set_attribute('class', 'generaltable generalbox reporttable');
-$table->pagesize(DEFAULT_PAGE_SIZE, $number_of_records);
+$table->sortable(true, 'lastname', SORT_ASC);
+$table->no_sorting('select');
 $table->set_control_variables(array(
                                 TABLE_VAR_SORT    => 'ssort',
                                 TABLE_VAR_HIDE    => 'shide',
@@ -82,49 +89,26 @@ $table->set_control_variables(array(
                                 TABLE_VAR_ILAST   => 'silast',
                                 TABLE_VAR_PAGE    => 'spage',
                                 ));
-
-$table->is_downloadable(true);
-$download_type = optional_param('download', '', PARAM_ALPHA);
-$filename_report = 'blumod_report_' . date('Ymd_Hi');
-$table->is_downloading($download_type, $filename_report, get_string('blumod', 'block_blumod'));
-$table->show_download_buttons_at([TABLE_P_TOP, TABLE_P_BOTTOM]);
-$page_table = optional_param('spage', 0, PARAM_INT);
-
 $table->setup();
 
-$sortcolumn = $table->get_sql_sort();
-if (empty($sortcolumn)) {
-    $sortcolumn = 'bluname'; // Default column to sort by.
+// $table->initialbars($totalcount > $perpage);
+// $table->pagesize($perpage, $matchcount);
+
+$data = $reportcourse->loadData();
+foreach ($data as $row) {
+    $table->add_data($row);
 }
-
-uasort($data, function ($a, $b) use ($sortcolumn) {
-    $sortparts = explode(',', $sortcolumn);
-    foreach ($sortparts as $sortpart) {
-        list($column, $direction) = explode(' ', trim($sortpart));
-        if ($a->$column == $b->$column) {
-            continue;
-        }
-        return ($direction == 'ASC') ? ($a->$column < $b->$column ? -1 : 1) : ($a->$column > $b->$column ? -1 : 1);
-    }
-    return 0;
-});
-
-if ($table->is_downloading()) {
-    foreach ($data as $row) {
-        $table->add_data((array) $row);
-    }
-    $table->finish_output();
-    exit;
-}
-
-echo $OUTPUT->header();
-
-$start_table = $page_table * DEFAULT_PAGE_SIZE;
-$end_table = $start_table + DEFAULT_PAGE_SIZE;
-
-foreach (array_slice($data, $start_table, DEFAULT_PAGE_SIZE) as $row) {
-    $table->add_data((array) $row);
-}
-
 $table->finish_output();
+
+// Selector BLUs
+echo html_writer::start_tag('div');
+echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
+echo html_writer::end_tag('div');
+
+echo '<form class="form-inline" action="reportcourse.php" method="get"><div>'."\n".
+'<input type="hidden" name="courseid" value="'.$course->id.'" />';
+'<input type="hidden" name="bluid" value="'.$block_blu->id.'" />'."\n";
+echo '<input type="submit" value="'.get_string('go').'" class="btn btn-primary"/>'."\n</div></form>\n";
+
+
 echo $OUTPUT->footer();

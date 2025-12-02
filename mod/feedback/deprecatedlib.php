@@ -23,14 +23,6 @@
  */
 
 /**
- * @deprecated since Moodle 3.11
- */
-function feedback_get_completion_state() {
-    $completionclass = \mod_feedback\completion\custom_completion::class;
-    throw new coding_exception(__FUNCTION__ . "() has been removed, please use the '{$completionclass}' class instead");
-}
-
-/**
  * Returns true if the current role is faked by switching role feature
  *
  * @return bool
@@ -39,6 +31,6 @@ function feedback_get_completion_state() {
 #[\core\attribute\deprecated('is_role_switched', since: '4.5', mdl: 'MDL-72424')]
 function feedback_check_is_switchrole(): bool {
     global $USER;
-    \core\deprecation::emit_deprecation_if_present(__FUNCTION__);
+    \core\deprecation::emit_deprecation(__FUNCTION__);
     return isset($USER->switchrole) && is_array($USER->switchrole) && count($USER->switchrole) > 0;
 }

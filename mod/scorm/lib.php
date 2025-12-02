@@ -54,8 +54,6 @@ define('SCORM_DISPLAY_ATTEMPTSTATUS_ENTRY', 3);
 define('SCORM_EVENT_TYPE_OPEN', 'open');
 define('SCORM_EVENT_TYPE_CLOSE', 'close');
 
-require_once(__DIR__ . '/deprecatedlib.php');
-
 /**
  * Return an array of status options
  *
@@ -777,7 +775,7 @@ function scorm_option2text($scorm) {
 function scorm_reset_course_form_definition(&$mform) {
     $mform->addElement('header', 'scormheader', get_string('modulenameplural', 'scorm'));
     $mform->addElement('static', 'scormdelete', get_string('delete'));
-    $mform->addElement('advcheckbox', 'reset_scorm', get_string('deleteallattempts', 'scorm'));
+    $mform->addElement('advcheckbox', 'reset_scorm', get_string('allattempts', 'scorm'));
 }
 
 /**
@@ -840,7 +838,7 @@ function scorm_reset_userdata($data) {
             scorm_reset_gradebook($data->courseid);
         }
 
-        $status[] = ['component' => $componentstr, 'item' => get_string('deleteallattempts', 'scorm'), 'error' => false];
+        $status[] = ['component' => $componentstr, 'item' => get_string('allattempts', 'scorm'), 'error' => false];
     }
 
     // Any changes to the list of dates that needs to be rolled should be same during course restore and course reset.
@@ -1102,13 +1100,6 @@ function scorm_debug_log_remove($type, $scoid) {
     }
 
     return @unlink($logfile);
-}
-
-/**
- * @deprecated since Moodle 3.3, when the block_course_overview block was removed.
- */
-function scorm_print_overview() {
-    throw new coding_exception('scorm_print_overview() can not be used any more and is obsolete.');
 }
 
 /**
@@ -1463,7 +1454,6 @@ function mod_scorm_get_fontawesome_icon_map() {
     return [
         'mod_scorm:asset' => 'fa-regular fa-file-zipper',
         'mod_scorm:assetc' => 'fa-regular fa-file-zipper',
-        'mod_scorm:browsed' => 'fa-book',
         'mod_scorm:completed' => 'fa-regular fa-square-check',
         'mod_scorm:failed' => 'fa-xmark',
         'mod_scorm:incomplete' => 'fa-regular fa-pen-to-square',

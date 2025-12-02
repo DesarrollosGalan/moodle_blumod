@@ -379,14 +379,14 @@ M.core_availability.List = function(json, root, parentRoot) {
             '<div class="availability-header mb-1"><span>' +
             M.util.get_string('listheader_sign_before', 'availability') + '</span>' +
             ' <label><span class="accesshide">' + M.util.get_string('label_sign', 'availability') +
-            ' </span><select class="availability-neg custom-select mx-1"' +
+            ' </span><select class="availability-neg form-select mx-1"' +
             ' title="' + M.util.get_string('label_sign', 'availability') + '">' +
             '<option value="">' + M.util.get_string('listheader_sign_pos', 'availability') + '</option>' +
             '<option value="!">' + M.util.get_string('listheader_sign_neg', 'availability') + '</option></select></label> ' +
             '<span class="availability-single">' + M.util.get_string('listheader_single', 'availability') + '</span>' +
             '<span class="availability-multi">' + M.util.get_string('listheader_multi_before', 'availability') +
             ' <label><span class="accesshide">' + M.util.get_string('label_multi', 'availability') + ' </span>' +
-            '<select class="availability-op custom-select mx-1"' +
+            '<select class="availability-op form-select mx-1"' +
             ' title="' + M.util.get_string('label_multi', 'availability') + '"><option value="&">' +
             M.util.get_string('listheader_multi_and', 'availability') + '</option>' +
             '<option value="|">' + M.util.get_string('listheader_multi_or', 'availability') + '</option></select></label> ' +
@@ -764,7 +764,7 @@ M.core_availability.List.prototype.clickAdd = function() {
     dialogRef.dialog = new M.core.dialogue(config);
     dialogRef.dialog.show();
     cancel.on('click', function() {
-        dialogRef.dialog.destroy();
+        dialogRef.dialog.hide();
         // Focus the button they clicked originally.
         this.inner.one('> .availability-button').one('button').focus();
     }, this);
@@ -801,7 +801,7 @@ M.core_availability.List.prototype.getAddHandler = function(type, dialogRef) {
         M.core_availability.form.rootList.renumber();
         this.updateHtml();
         // Hide dialog.
-        dialogRef.dialog.destroy();
+        dialogRef.dialog.hide();
         newItem.focusAfterAdd();
     };
 };

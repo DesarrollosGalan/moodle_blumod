@@ -1079,6 +1079,7 @@ function purify_html($text, $options = array()) {
 
         $config->set('HTML.DefinitionID', 'moodlehtml');
         $config->set('HTML.DefinitionRev', 7);
+        $config->set('CSS.Proprietary', true);
         $config->set('Cache.SerializerPath', $cachedir);
         $config->set('Cache.SerializerPermissions', $CFG->directorypermissions);
         $config->set('Core.NormalizeNewlines', false);
@@ -1237,15 +1238,9 @@ function text_to_html($text, $smileyignored = null, $para = true, $newlines = tr
  * @return string Converted text
  */
 function markdown_to_html($text) {
-    global $CFG;
-
     if ($text === '' or $text === null) {
         return $text;
     }
-
-    require_once($CFG->libdir .'/markdown/MarkdownInterface.php');
-    require_once($CFG->libdir .'/markdown/Markdown.php');
-    require_once($CFG->libdir .'/markdown/MarkdownExtra.php');
 
     return \Michelf\MarkdownExtra::defaultTransform($text);
 }
@@ -1569,8 +1564,7 @@ function send_headers($contenttype, $cacheable = true) {
         @header('Expires: ');
     } else {
         // Do everything we can to always prevent clients and proxies caching.
-        @header('Cache-Control: no-store, no-cache, must-revalidate');
-        @header('Cache-Control: post-check=0, pre-check=0, no-transform', false);
+        @header('Cache-Control: no-store, no-cache, must-revalidate, no-transform');
         @header('Pragma: no-cache');
         @header('Expires: Mon, 20 Aug 1969 09:23:00 GMT');
         @header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
@@ -1830,7 +1824,7 @@ function print_group_picture($group, $courseid, $large = false, $return = false,
 
     $context = context_course::instance($courseid);
 
-    $groupname = s($group->name);
+    $groupname = format_string($group->name, true, ['context' => $context, 'escape' => false]);
     $pictureimage = html_writer::img($pictureurl, $groupname, ['title' => $groupname]);
 
     $output = '';
@@ -2682,7 +2676,9 @@ function get_formatted_help_string($identifier, $component, $ajax = false, $a = 
 
         $helplink = $identifier . '_link';
         if ($sm->string_exists($helplink, $component)) {  // Link to further info in Moodle docs.
-            $link = get_string($helplink, $component);
+            // The link is stored in a language file but should not be translated, use value for English.
+            $link = $sm->get_string($helplink, $component, null, 'en');
+            // The text 'More help' should be in the current language.
             $linktext = get_string('morehelp');
 
             $data->doclink = new stdClass();

@@ -26,6 +26,7 @@
 
 import SectionTitle from 'core_courseformat/local/courseindex/sectiontitle';
 import DndSection from 'core_courseformat/local/courseeditor/dndsection';
+import log from "core/log";
 
 export default class Component extends DndSection {
 
@@ -41,6 +42,7 @@ export default class Component extends DndSection {
             SECTION_ITEM: `[data-for='section_item']`,
             SECTION_TITLE: `[data-for='section_title']`,
             CM_LAST: `[data-for="cm"]:last-child`,
+            DND_ALLOWED: `[data-courseindexdndallowed='true']`,
         };
         // Default classes to toggle on refresh.
         this.classes = {
@@ -65,8 +67,14 @@ export default class Component extends DndSection {
      * @return {Component}
      */
     static init(target, selectors) {
+        let element = document.querySelector(target);
+        // TODO Remove this if condition as part of MDL-83851.
+        if (!element) {
+            log.debug('Init component with id is deprecated, use a query selector instead.');
+            element = document.getElementById(target);
+        }
         return new this({
-            element: document.getElementById(target),
+            element,
             selectors,
         });
     }
@@ -80,7 +88,7 @@ export default class Component extends DndSection {
         this.configState(state);
         const sectionItem = this.getElement(this.selectors.SECTION_ITEM);
         // Drag and drop is only available for components compatible course formats.
-        if (this.reactive.isEditing && this.reactive.supportComponents) {
+        if (this.reactive.isEditing && this.reactive.supportComponents && document.querySelector(this.selectors.DND_ALLOWED)) {
             // Init the inner dragable element passing the full section as affected region.
             const titleitem = new SectionTitle({
                 ...this,
@@ -91,7 +99,8 @@ export default class Component extends DndSection {
         }
         // Check if the current url is the section url.
         const section = state.section.get(this.id);
-        if (window.location.href == section.sectionurl.replace(/&amp;/g, "&")) {
+        // Sections urls may be null.
+        if (window.location.href == section.sectionurl?.replace(/&amp;/g, "&")) {
             this.reactive.dispatch('setPageItem', 'section', this.id);
             sectionItem.scrollIntoView();
         }

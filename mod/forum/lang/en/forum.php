@@ -16,7 +16,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings for component 'forum', language 'en', branch 'MOODLE_20_STABLE'
+ * Strings for component 'mod_forum', language 'en', branch 'MOODLE_20_STABLE'
  *
  * @package   mod_forum
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
@@ -36,7 +36,7 @@ $string['advancedsearch'] = 'Advanced search';
 $string['alldiscussions'] = 'All discussions';
 $string['allforums'] = 'All forums';
 $string['allowdiscussions'] = 'Can a {$a} post to this forum?';
-$string['allowsallsubscribe'] = 'This forum allows everyone to choose whether to subscribe or not';
+$string['allowsallsubscribe'] = 'This forum allows everyone to choose whether to subscribe or not.';
 $string['allowsdiscussions'] = 'This forum allows each person to start one discussion topic.';
 $string['allsubscribe'] = 'Subscribe to all forums';
 $string['allunsubscribe'] = 'Unsubscribe from all forums';
@@ -292,7 +292,7 @@ $string['favouriteupdated'] = 'Your star option has been updated.';
 $string['forcedreadtracking'] = 'Allow forced read tracking';
 $string['forcedreadtracking_desc'] = 'Allows forums to be set to forced read tracking. Will result in decreased performance for some users, particularly on courses with many forums and posts. When off, any forums previously set to Forced are treated as optional.';
 $string['forcesubscribed_help'] = 'This forum has been configured so that you cannot unsubscribe from discussions.';
-$string['forcesubscribed'] = 'This forum forces everyone to be subscribed';
+$string['forcesubscribed'] = 'This forum forces everyone to be subscribed.';
 $string['forum'] = 'Forum';
 $string['forum:addinstance'] = 'Add a new forum';
 $string['forum:addnews'] = 'Add announcements';
@@ -419,7 +419,7 @@ $string['messageinboundfilecountexceeded'] = 'Unable to post your reply, since i
 $string['messageinboundfilesizeexceeded'] = 'Unable to post your reply, since the total attachment size ({$a->filesize}) is greater than the maximum size allowed for the forum ({$a->maxbytes}).';
 $string['messageinboundforumhidden'] = 'Unable to post your reply, since the forum is currently unavailable.';
 $string['messageinboundnopostforum'] = 'Unable to post your reply, since you do not have permission to post in the {$a->forum->name} forum.';
-$string['messageinboundthresholdhit'] = 'Unable to post your reply.  You have exceeded the posting threshold set for this forum';
+$string['messageinboundthresholdhit'] = 'Unable to post your reply. You have exceeded the posting threshold set for this forum.';
 $string['messageprovider:digests'] = 'Subscribed forum digests';
 $string['messageprovider:posts'] = 'Subscribed forum posts';
 $string['missingsearchterms'] = 'The following search terms occur only in the HTML markup of this message:';
@@ -465,7 +465,7 @@ $string['nextdiscussiona'] = 'Next discussion: {$a}';
 $string['nextuser'] = 'Save changes and proceed to the next user';
 $string['newforumposts'] = 'New forum posts';
 $string['noattachments'] = 'There are no attachments to this post';
-$string['nodiscussions'] = 'There are no discussion topics yet in this forum';
+$string['nodiscussions'] = 'There are no discussion topics yet in this forum.';
 $string['nodiscussionsstartedby'] = '{$a} has not started any discussions';
 $string['nodiscussionsstartedbyyou'] = 'You haven\'t started any discussions yet';
 $string['noguestpost'] = 'Only logged in users can post to this forum.';
@@ -477,21 +477,21 @@ $string['nonews'] = 'No announcements have been posted yet.';
 $string['noonecansubscribenow'] = 'Subscriptions are now disallowed';
 $string['nopermissiontosubscribe'] = 'You do not have the permission to view forum subscribers';
 $string['nopermissiontoview'] = 'You do not have permissions to view this post';
-$string['nopostforum'] = 'Sorry, you are not allowed to post to this forum';
+$string['nopostforum'] = 'You are not allowed to post to this forum.';
 $string['noposts'] = 'No posts';
 $string['nopostsmadebyuser'] = '{$a} has made no posts';
 $string['nopostsmadebyyou'] = 'You haven\'t made any posts';
-$string['noquestions'] = 'There are no questions yet in this forum';
-$string['nosubscribers'] = 'There are no subscribers yet for this forum';
+$string['noquestions'] = 'There are no questions yet in this forum.';
+$string['nosubscribers'] = 'There are no subscribers yet for this forum.';
 $string['notsubscribed'] = 'Subscribe';
 $string['notexists'] = 'Discussion no longer exists';
 $string['nothingnew'] = 'Nothing new for {$a}';
-$string['notingroup'] = 'Sorry, but you need to be part of a group to see this forum.';
+$string['notingroup'] = 'You need to be part of a group to see this forum.';
 $string['notinstalled'] = 'The forum module is not installed';
 $string['notlocked'] = 'Lock';
 $string['notpartofdiscussion'] = 'This post is not part of a discussion!';
 $string['notrackforum'] = 'Don\'t track unread posts';
-$string['noviewdiscussionspermission'] = 'You do not have the permission to view discussions in this forum';
+$string['noviewdiscussionspermission'] = 'You do not have permission to view discussions in this forum.';
 $string['nowallsubscribed'] = 'You are now subscribed to all forums in {$a}.';
 $string['nowallunsubscribed'] = 'You are now unsubscribed from all forums in {$a}.';
 $string['nownotsubscribed'] = '{$a->name} will NOT be notified of new posts in \'{$a->forum}\'';
@@ -608,7 +608,6 @@ $string['prunedpost'] = 'A new discussion has been created from that post';
 $string['pruneheading'] = 'Split the discussion and move this post to a new discussion';
 $string['qandaforum'] = 'Q and A forum';
 $string['qandanotify'] = 'This is a question and answer forum. To see other replies, you must first post your reply.';
-$string['re'] = 'Re:';
 $string['readtherest'] = 'Read the rest of this topic';
 $string['removeallforumtags'] = 'All forum tags';
 $string['removefromfavourites'] = 'Unstar this discussion';
@@ -784,15 +783,11 @@ $string['showmoreusers'] = 'Show more users';
 $string['viewconversation'] = 'View discussion';
 $string['viewgrades'] = 'View grades';
 
-// Deprecated since Moodle 4.3.
-$string['completionpostsgroup'] = 'Require posts';
-$string['completiondiscussionsgroup'] = 'Require discussions';
-$string['completiondiscussionshelp'] = 'requiring discussions to complete';
-$string['completionrepliesgroup'] = 'Require replies';
-$string['completionreplieshelp'] = 'requiring replies to complete';
-
 // Deprecated since Moodle 4.5.
 $string['privacy:request:delete:discussion:name'] = 'Delete at the request of the author';
 $string['privacy:request:delete:post:message'] = 'The content of this post has been deleted at the request of its author.';
 $string['privacy:request:delete:post:subject'] = 'Delete at the request of the author';
 $string['tagsdeleted'] = 'Forum tags have been deleted';
+
+// Deprecated since Moodle 5.0.
+$string['re'] = 'Re:';

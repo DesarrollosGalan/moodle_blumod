@@ -34,10 +34,10 @@ define('DEBUG_NONE', 0);
 define('DEBUG_MINIMAL', E_ERROR | E_PARSE);
 /** Errors, warnings and notices */
 define('DEBUG_NORMAL', E_ERROR | E_PARSE | E_WARNING | E_NOTICE);
-/** All problems except strict PHP warnings */
-define('DEBUG_ALL', E_ALL & ~E_STRICT);
-/** DEBUG_ALL with all debug messages and strict warnings */
-define('DEBUG_DEVELOPER', E_ALL | E_STRICT);
+/** All problems. Formerly, all problems, except the erstwhile strict PHP warnings before E_STRICT got deprecated. */
+define('DEBUG_ALL', E_ALL);
+/** Same as DEBUG_ALL since E_STRICT was deprecated. */
+define('DEBUG_DEVELOPER', E_ALL);
 
 /** Remove any memory limits */
 define('MEMORY_UNLIMITED', -1);
@@ -387,15 +387,6 @@ function get_exception_info($ex): stdClass {
     $info->debuginfo   = $debuginfo;
 
     return $info;
-}
-
-/**
- * @deprecated since Moodle 3.8 MDL-61038 - please do not use this function any more.
- * @see \core\uuid::generate()
- */
-function generate_uuid() {
-    throw new coding_exception('generate_uuid() cannot be used anymore. Please use ' .
-        '\core\uuid::generate() instead.');
 }
 
 /**
@@ -802,24 +793,25 @@ function setup_get_remote_url() {
         $rurl['fullpath'] = $_SERVER['REQUEST_URI'];
 
         // Fixing a known issue with:
-        // - Apache versions lesser than 2.4.11
+        // - Apache
         // - PHP deployed in Apache as PHP-FPM via mod_proxy_fcgi
-        // - PHP versions lesser than 5.6.3 and 5.5.18.
+        // - PHP versions lesser than 8.1.18 or 8.2.5.
         if (isset($_SERVER['PATH_INFO']) && (php_sapi_name() === 'fpm-fcgi') && isset($_SERVER['SCRIPT_NAME'])) {
-            $pathinfodec = rawurldecode($_SERVER['PATH_INFO']);
-            $lenneedle = strlen($pathinfodec);
-            // Checks whether SCRIPT_NAME ends with PATH_INFO, URL-decoded.
-            if (substr($_SERVER['SCRIPT_NAME'], -$lenneedle) === $pathinfodec) {
-                // This is the "Apache 2.4.10- running PHP-FPM via mod_proxy_fcgi" fingerprint,
-                // at least on CentOS 7 (Apache/2.4.6 PHP/5.4.16) and Ubuntu 14.04 (Apache/2.4.7 PHP/5.5.9)
-                // => SCRIPT_NAME contains 'slash arguments' data too, which is wrongly exposed via PATH_INFO as URL-encoded.
-                // Fix both $_SERVER['PATH_INFO'] and $_SERVER['SCRIPT_NAME'].
-                $lenhaystack = strlen($_SERVER['SCRIPT_NAME']);
-                $pos = $lenhaystack - $lenneedle;
-                // Here $pos is greater than 0 but let's double check it.
-                if ($pos > 0) {
-                    $_SERVER['PATH_INFO'] = $pathinfodec;
-                    $_SERVER['SCRIPT_NAME'] = substr($_SERVER['SCRIPT_NAME'], 0, $pos);
+            $_SERVER['PATH_INFO'] = rawurldecode($_SERVER['PATH_INFO']);
+            if (PHP_VERSION_ID < 80118 || (PHP_VERSION_ID >= 80200 && PHP_VERSION_ID < 80205)) {
+                $lenneedle = strlen($_SERVER['PATH_INFO']);
+                // Checks whether SCRIPT_NAME ends with PATH_INFO, URL-decoded.
+                if (substr($_SERVER['SCRIPT_NAME'], -$lenneedle) === $_SERVER['PATH_INFO']) {
+                    // This is the "Apache running PHP-FPM via mod_proxy_fcgi with PHP < 8.1.18 or PHP < 8.2.5" fingerprint,
+                    // at least on CentOS 7 (Apache/2.4.6 PHP/8.0.30)
+                    // => SCRIPT_NAME contains 'slash arguments' data too, which is wrongly exposed via PATH_INFO as URL-encoded.
+                    // Fix $_SERVER['SCRIPT_NAME'].
+                    $lenhaystack = strlen($_SERVER['SCRIPT_NAME']);
+                    $pos = $lenhaystack - $lenneedle;
+                    // Here $pos is greater than 0 but let's double check it.
+                    if ($pos > 0) {
+                        $_SERVER['SCRIPT_NAME'] = substr($_SERVER['SCRIPT_NAME'], 0, $pos);
+                    }
                 }
             }
         }
@@ -845,41 +837,14 @@ function setup_get_remote_url() {
         }
         $_SERVER['REQUEST_URI'] = $rurl['fullpath']; // extra IIS compatibility
 
-/* NOTE: following servers are not fully tested! */
-
-    } else if (stripos($_SERVER['SERVER_SOFTWARE'], 'lighttpd') !== false) {
-        //lighttpd - not officially supported
-        $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
     } else if (stripos($_SERVER['SERVER_SOFTWARE'], 'nginx') !== false) {
-        //nginx - not officially supported
         if (!isset($_SERVER['SCRIPT_NAME'])) {
             die('Invalid server configuration detected, please try to add "fastcgi_param SCRIPT_NAME $fastcgi_script_name;" to the nginx server configuration.');
         }
-        $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
-     } else if (stripos($_SERVER['SERVER_SOFTWARE'], 'cherokee') !== false) {
-         //cherokee - not officially supported
-         $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
-     } else if (stripos($_SERVER['SERVER_SOFTWARE'], 'zeus') !== false) {
-         //zeus - not officially supported
-         $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
-    } else if (stripos($_SERVER['SERVER_SOFTWARE'], 'LiteSpeed') !== false) {
-        //LiteSpeed - not officially supported
-        $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
-    } else if ($_SERVER['SERVER_SOFTWARE'] === 'HTTPD') {
-        //obscure name found on some servers - this is definitely not supported
-        $rurl['fullpath'] = $_SERVER['REQUEST_URI']; // TODO: verify this is always properly encoded
-
-    } else if (strpos($_SERVER['SERVER_SOFTWARE'], 'PHP') === 0) {
-        // built-in PHP Development Server
         $rurl['fullpath'] = $_SERVER['REQUEST_URI'];
-
     } else {
-        throw new moodle_exception('unsupportedwebserver', 'error', '', $_SERVER['SERVER_SOFTWARE']);
+        // Any other servers we can assume will pass the request_uri normally.
+        $rurl['fullpath'] = $_SERVER['REQUEST_URI'];
     }
 
     // sanitize the url a bit more, the encoding style may be different in vars above

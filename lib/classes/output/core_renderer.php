@@ -23,7 +23,6 @@ use core_block\output\block_contents;
 use core_block\output\block_move_target;
 use core_completion\cm_completion_details;
 use core\context;
-use core_course\output\activity_information;
 use core_tag\output\taglist;
 use core_text;
 use core_useragent;
@@ -42,6 +41,7 @@ use core\hook\output\before_standard_footer_html_generation;
 use core\hook\output\before_standard_top_of_body_html_generation;
 use core\output\actions\component_action;
 use core\output\actions\popup_action;
+use core\output\local\properties\badge;
 use core\plugin_manager;
 use moodleform;
 use moodle_page;
@@ -211,7 +211,7 @@ class core_renderer extends renderer_base {
             $hook->add_html(
                 html_writer::empty_tag('meta', [
                     'http-equiv' => 'refresh',
-                    'content' => $this->page->periodicrefreshdelay . ';url=' . $this->page->url->out(),
+                    'content' => $this->page->periodicrefreshdelay . ';url=' . $this->page->url->out(false),
                 ]),
             );
         }
@@ -462,25 +462,11 @@ class core_renderer extends renderer_base {
     }
 
     /**
-     * Returns information about an activity.
-     *
      * @deprecated since Moodle 4.3 MDL-78744
-     * @todo MDL-78926 This method will be deleted in Moodle 4.7
-     * @param cm_info $cminfo The course module information.
-     * @param cm_completion_details $completiondetails The completion details for this activity module.
-     * @param array $activitydates The dates for this activity module.
-     * @return string the activity information HTML.
-     * @throws coding_exception
      */
-    public function activity_information(cm_info $cminfo, cm_completion_details $completiondetails, array $activitydates): string {
-        debugging('activity_information method is deprecated.', DEBUG_DEVELOPER);
-        if (!$completiondetails->has_completion() && empty($activitydates)) {
-            // No need to render the activity information when there's no completion info and activity dates to show.
-            return '';
-        }
-        $activityinfo = new activity_information($cminfo, $completiondetails, $activitydates);
-        $renderer = $this->page->get_renderer('core', 'course');
-        return $renderer->render($activityinfo);
+    #[\core\attribute\deprecated(null, since: '4.3', mdl: 'MDL-78744', final: true)]
+    public function activity_information() {
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -522,8 +508,9 @@ class core_renderer extends renderer_base {
         $mods = [];
         $activitylist = [];
         foreach ($modules as $module) {
-            // Only add activities the user can access, aren't in stealth mode and have a url (eg. mod_label does not).
-            if (!$module->uservisible || $module->is_stealth() || empty($module->url)) {
+            // Only add activities the user can access, aren't in stealth mode, are of a type that is visible on the course,
+            // and have a url (eg. mod_label does not).
+            if (!$module->uservisible || $module->is_stealth() || empty($module->url) || !$module->is_of_type_that_can_display()) {
                 continue;
             }
             $mods[$module->id] = $module;
@@ -546,8 +533,8 @@ class core_renderer extends renderer_base {
 
         $nummods = count($mods);
 
-        // If there is only one mod then do nothing.
-        if ($nummods == 1) {
+        // If there are only one or fewer mods then do nothing.
+        if ($nummods <= 1) {
             return '';
         }
 
@@ -663,8 +650,8 @@ class core_renderer extends renderer_base {
             $fullname = fullname($USER);
             // Since Moodle 2.0 this link always goes to the public profile page (not the course profile page)
             if ($withlinks) {
-                $linktitle = get_string('viewprofile');
-                $username = "<a href=\"$CFG->wwwroot/user/profile.php?id=$USER->id\" title=\"$linktitle\">$fullname</a>";
+                $userurl = new moodle_url('/user/profile.php', ['id' => $USER->id]);
+                $username = html_writer::link($userurl, $fullname);
             } else {
                 $username = $fullname;
             }
@@ -1351,7 +1338,9 @@ class core_renderer extends renderer_base {
         }
 
         // Add the action link.
-        $renderedresult .= $this->render_action_link($check->get_action_link());
+        if ($actionlink = $check->get_action_link()) {
+            $renderedresult .= $this->render_action_link($actionlink);
+        }
 
         return $renderedresult;
     }
@@ -1397,7 +1386,7 @@ class core_renderer extends renderer_base {
         mdl: 'MDL-83164',
     )]
     protected function render_action_menu_link(\action_menu_link $action) {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         return $this->render_action_menu__link($action);
     }
 
@@ -1410,7 +1399,7 @@ class core_renderer extends renderer_base {
         mdl: 'MDL-83164',
     )]
     protected function render_action_menu_filler(\action_menu_filler $action) {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         return $this->render_action_menu__filler($action);
     }
 
@@ -1423,7 +1412,7 @@ class core_renderer extends renderer_base {
         mdl: 'MDL-83164',
     )]
     protected function render_action_menu_primary(\action_menu_link $action) {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         return $this->render_action_menu__link_primary($action);
     }
 
@@ -1436,7 +1425,7 @@ class core_renderer extends renderer_base {
         mdl: 'MDL-83164',
     )]
     protected function render_action_menu_secondary(\action_menu_link $action) {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         return $this->render_action_menu__link_secondary($action);
     }
 
@@ -1506,7 +1495,8 @@ class core_renderer extends renderer_base {
         $context->ariarole = !empty($bc->attributes['role']) ? $bc->attributes['role'] : '';
         $context->class = $bc->attributes['class'];
         $context->type = $bc->attributes['data-block'];
-        $context->title = $bc->title;
+        $context->title = (string) $bc->title;
+        $context->showtitle = $context->title !== '';
         $context->content = $bc->content;
         $context->annotation = $bc->annotation;
         $context->footer = $bc->footer;
@@ -1672,14 +1662,20 @@ class core_renderer extends renderer_base {
             $attributes['class'] = 'action-icon';
         }
 
-        if ($linktext) {
-            $text = $pixicon->attributes['alt'];
-            // Set the icon as a decorative image if we're displaying the action text.
-            // Otherwise, the action name will be read twice by assistive technologies.
-            $pixicon->attributes['alt'] = '';
-            $pixicon->attributes['title'] = '';
-            $pixicon->attributes['aria-hidden'] = 'true';
-        } else {
+        $text = $pixicon->attributes['alt'];
+        // Set the icon as a decorative image. The accessible label should be within the link itself and not the icon.
+        $pixicon->attributes['alt'] = '';
+        $pixicon->attributes['title'] = '';
+        $pixicon->attributes['aria-hidden'] = 'true';
+
+        $attributes['class'] .= ' mx-1 p-1';
+        if (!$linktext) {
+            // Set a title attribute on the link for sighted users if no text is shown.
+            $attributes['title'] = $text;
+            // Style the icon button for increased target area.
+            $attributes['class'] .= ' btn btn-link icon-no-margin';
+            // Make the action text only available to screen readers.
+            $attributes['aria-label'] = $text;
             $text = '';
         }
 
@@ -1945,8 +1941,7 @@ class core_renderer extends renderer_base {
             $newwindowicon = $this->pix_icon(
                 'i/externallink',
                 get_string('opensinnewwindow'),
-                'moodle',
-                ['class' => 'fa fa-externallink fa-fw']
+                attributes: ['class' => 'ms-1'],
             );
         }
 
@@ -2080,7 +2075,7 @@ class core_renderer extends renderer_base {
                 'action' => $rateurl->out_omit_querystring(),
             ];
             $formstart  = html_writer::start_tag('form', $formattrs);
-            $formstart .= html_writer::start_tag('div', ['class' => 'ratingform']);
+            $formstart .= html_writer::start_tag('div', ['class' => 'ratingform hstack gap-2']);
 
             // add the hidden inputs
             foreach ($inputs as $name => $value) {
@@ -2146,15 +2141,6 @@ class core_renderer extends renderer_base {
         }
 
         return $this->heading($image . $text . $help, $level, $classnames);
-    }
-
-    /**
-     * Returns HTML to display a help icon.
-     *
-     * @deprecated since Moodle 2.0
-     */
-    public function old_help_icon($helpidentifier, $title, $component = 'moodle', $linktext = '') {
-        throw new coding_exception('old_help_icon() can not be used any more, please see help_icon().');
     }
 
     /**
@@ -2500,15 +2486,6 @@ EOD;
     }
 
     /**
-     * @deprecated since Moodle 3.2
-     */
-    public function update_module_button() {
-        throw new coding_exception('core_renderer::update_module_button() can not be used anymore. Activity ' .
-            'modules should not add the edit module button, the link is already available in the Administration block. ' .
-            'Themes can choose to display the link in the buttons row consistently for all module types.');
-    }
-
-    /**
      * Returns HTML to display a "Turn editing on/off" button in a form.
      *
      * @param moodle_url $url The URL + params to send through when clicking the button
@@ -2752,38 +2729,6 @@ EOD;
     }
 
     /**
-     * @deprecated since Moodle 3.1 MDL-30811 - please do not use this function any more.
-     */
-    public function notify_problem() {
-        throw new coding_exception('core_renderer::notify_problem() can not be used any more, ' .
-            'please use \core\notification::add(), or \core\output\notification as required.');
-    }
-
-    /**
-     * @deprecated since Moodle 3.1 MDL-30811 - please do not use this function any more.
-     */
-    public function notify_success() {
-        throw new coding_exception('core_renderer::notify_success() can not be used any more, ' .
-            'please use \core\notification::add(), or \core\output\notification as required.');
-    }
-
-    /**
-     * @deprecated since Moodle 3.1 MDL-30811 - please do not use this function any more.
-     */
-    public function notify_message() {
-        throw new coding_exception('core_renderer::notify_message() can not be used any more, ' .
-            'please use \core\notification::add(), or \core\output\notification as required.');
-    }
-
-    /**
-     * @deprecated since Moodle 3.1 MDL-30811 - please do not use this function any more.
-     */
-    public function notify_redirect() {
-        throw new coding_exception('core_renderer::notify_redirect() can not be used any more, ' .
-            'please use \core\notification::add(), or \core\output\notification as required.');
-    }
-
-    /**
      * Render a notification (that is, a status message about something that has
      * just happened).
      *
@@ -2952,13 +2897,56 @@ EOD;
      *
      * @param string $contents The contents of the paragraph
      * @return string the HTML to output.
+     * @deprecated since 5.0. Use visually_hidden_text() instead.
+     * @todo Final deprecation in Moodle 6.0. See MDL-83671.
      */
+    #[\core\attribute\deprecated('core_renderer::visually_hidden_text()', since: '5.0', mdl: 'MDL-81825')]
     public function sr_text(string $contents): string {
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
+        return $this->visually_hidden_text($contents);
+    }
+
+    /**
+     * Outputs a visually hidden inline text (but accessible to assistive technologies).
+     *
+     * @param string $contents The contents of the paragraph
+     * @return string the HTML to output.
+     */
+    public function visually_hidden_text(string $contents): string {
         return html_writer::tag(
             'span',
             $contents,
-            ['class' => 'sr-only']
+            ['class' => 'visually-hidden']
         ) . ' ';
+    }
+
+    /**
+     * Outputs a screen reader only inline text.
+     *
+     * @param string $contents The content of the badge
+     * @param badge $badgestyle The style of the badge (default is PRIMARY)
+     * @param string $title An optional title of the badge
+     * @return string the HTML to output.
+     */
+    public function notice_badge(
+        string $contents,
+        badge $badgestyle = badge::PRIMARY,
+        string $title = '',
+    ): string {
+        if ($contents === '') {
+            return '';
+        }
+        // We want the badges to be read as content in parentesis.
+        $contents = trim($this->visually_hidden_text(' ('))
+            . $contents
+            . trim($this->visually_hidden_text(')'));
+
+        $attributes = ['class' => 'ms-1 ' . $badgestyle->classes()];
+        if ($title !== '') {
+            $attributes['title'] = $title;
+        }
+
+        return html_writer::tag('span', $contents, $attributes);
     }
 
     /**
@@ -3079,7 +3067,8 @@ EOD;
             'hiddenfields' => (object) ['name' => 'context', 'value' => $this->page->context->id],
             'inputname' => 'q',
             'searchstring' => get_string('search'),
-            ];
+            'grouplabel' => get_string('sitewidesearch', 'search'),
+        ];
         return $this->render_from_template('core/search_input_navbar', $data);
     }
 
@@ -3486,6 +3475,14 @@ EOD;
         if (empty($custommenuitems) && !empty($CFG->custommenuitems)) {
             $custommenuitems = $CFG->custommenuitems;
         }
+
+        // If filtering of the primary custom menu is enabled, apply only the string filters.
+        if (!empty($CFG->navfilter) && !empty($CFG->stringfilters)) {
+            // Apply filters that are enabled for Content and Headings.
+            $filtermanager = \filter_manager::instance();
+            $custommenuitems = $filtermanager->filter_string($custommenuitems, \context_system::instance());
+        }
+
         $custommenu = new custom_menu($custommenuitems, current_language());
         return $this->render_custom_menu($custommenu);
     }
@@ -3501,6 +3498,14 @@ EOD;
         if (empty($custommenuitems) && !empty($CFG->custommenuitems)) {
             $custommenuitems = $CFG->custommenuitems;
         }
+
+        // If filtering of the primary custom menu is enabled, apply only the string filters.
+        if (!empty($CFG->navfilter) && !empty($CFG->stringfilters)) {
+            // Apply filters that are enabled for Content and Headings.
+            $filtermanager = \filter_manager::instance();
+            $custommenuitems = $filtermanager->filter_string($custommenuitems, \context_system::instance());
+        }
+
         $custommenu = new custom_menu($custommenuitems, current_language());
         $langs = get_string_manager()->get_list_of_translations();
         $haslangmenu = $this->lang_menu() != '';
@@ -3802,7 +3807,7 @@ EOD;
             'content' => get_string('blocks_main'),
             default => get_string('blocks'),
         };
-        $content = html_writer::tag('h2', $blocksheading, ['class' => 'sr-only', 'id' => $headingid]);
+        $content = html_writer::tag('h2', $blocksheading, ['class' => 'visually-hidden', 'id' => $headingid]);
         if ($this->page->blocks->region_has_content($displayregion, $this)) {
             $content .= $this->blocks_for_region($displayregion, $fakeblocksonly);
         }
@@ -4160,6 +4165,7 @@ EOD;
                     ];
 
                     if ($USER->id != $user->id) {
+                        $cancreatecontact = \core_message\api::can_create_contact($USER->id, $user->id);
                         $iscontact = \core_message\api::is_contact($USER->id, $user->id);
                         $isrequested = \core_message\api::get_contact_requests_between_users($USER->id, $user->id);
                         $contacturlaction = '';
@@ -4172,6 +4178,9 @@ EOD;
                         // If the user is not a contact.
                         if (!$iscontact) {
                             if ($isrequested) {
+                                // Set it to true if a request has been sent.
+                                $cancreatecontact = true;
+
                                 // We just need the first request.
                                 $requests = array_shift($isrequested);
                                 if ($requests->userid == $USER->id) {
@@ -4197,7 +4206,8 @@ EOD;
                             $contacturlaction = 'removecontact';
                             $contactimage = 't/removecontact';
                         }
-                        $userbuttons['togglecontact'] = [
+                        if ($cancreatecontact) {
+                            $userbuttons['togglecontact'] = [
                                 'buttontype' => 'togglecontact',
                                 'title' => get_string($contacttitle, 'message'),
                                 'url' => new moodle_url('/message/index.php', [
@@ -4210,6 +4220,7 @@ EOD;
                                 'linkattributes' => $linkattributes,
                                 'page' => $this->page,
                             ];
+                        }
                     }
                 }
             } else {
@@ -4217,9 +4228,10 @@ EOD;
             }
         }
 
-        // Return the heading wrapped in an sr-only element so it is only visible to screen-readers for nocontextheader layouts.
+        // Return the heading wrapped in an visually-hidden element so it is only visible to screen-readers
+        // for nocontextheader layouts.
         if (!empty($this->page->layout_options['nocontextheader'])) {
-            return html_writer::div($heading, 'sr-only');
+            return html_writer::div($heading, 'visually-hidden');
         }
 
         $contextheader = new context_header($heading, $headinglevel, $imagedata, $userbuttons);
@@ -4375,7 +4387,10 @@ EOD;
                 // We only add a list to the full settings menu if we didn't include every node in the short menu.
                 if ($skipped) {
                     $text = get_string('morenavigationlinks');
-                    $url = new moodle_url('/course/admin.php', ['courseid' => $this->page->course->id]);
+                    $url = \core\router\util::get_path_for_callable(
+                        [\core_course\route\controller\course_management::class, 'administer_course'],
+                        ['course' => $this->page->course->id],
+                    );
                     $link = new action_link($url, $text, null, null, new pix_icon('t/edit', $text));
                     $menu->add_secondary_action($link);
                 }
@@ -4389,7 +4404,10 @@ EOD;
                 // We only add a list to the full settings menu if we didn't include every node in the short menu.
                 if ($skipped) {
                     $text = get_string('morenavigationlinks');
-                    $url = new moodle_url('/course/admin.php', ['courseid' => $this->page->course->id]);
+                    $url = \core\router\util::get_path_for_callable(
+                        [\core_course\route\controller\course_management::class, 'administer_course'],
+                        ['course' => $this->page->course->id],
+                    );
                     $link = new action_link($url, $text, null, null, new pix_icon('t/edit', $text));
                     $menu->add_secondary_action($link);
                 }

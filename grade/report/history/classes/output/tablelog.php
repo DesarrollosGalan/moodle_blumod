@@ -214,6 +214,17 @@ class tablelog extends \table_sql implements \renderable {
     }
 
     /**
+     * Display name of country
+     *
+     * @param \stdClass $history
+     * @return string
+     */
+    public function col_country(\stdClass $history): string {
+        $countries = get_string_manager()->get_list_of_countries();
+        return $countries[$history->country] ?? $history->country;
+    }
+
+    /**
      * Method to display the final grade.
      *
      * @param \stdClass $history an entry of history record.
@@ -468,7 +479,10 @@ class tablelog extends \table_sql implements \renderable {
                             FROM {grade_grades_history} h
                            WHERE h.itemid = ggh.itemid
                              AND h.userid = ggh.userid
-                             AND h.timemodified < ggh.timemodified
+                             AND (
+                                    h.timemodified < ggh.timemodified
+                                    OR (h.timemodified = ggh.timemodified AND h.source != ggh.source AND h.id < ggh.id)
+                                 )
                              AND NOT EXISTS (
                               SELECT 1
                                 FROM {grade_grades_history} h2

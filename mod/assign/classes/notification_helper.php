@@ -227,7 +227,7 @@ class notification_helper {
         $assignmentobj = self::get_assignment_data($assignmentid);
 
         // Get our assignment users.
-        $users = $assignmentobj->list_participants(0, true);
+        $users = $assignmentobj->list_participants(0, true, false, true);
 
         foreach ($users as $key => $user) {
             // Check if the user has submitted already.
@@ -317,8 +317,14 @@ class notification_helper {
      * @param int $userid The user id.
      */
     public static function send_due_soon_notification_to_user(int $assignmentid, int $userid): void {
-        // Get assignment data.
-        $assignmentobj = self::get_assignment_data($assignmentid);
+        try {
+            // Get assignment data.
+            $assignmentobj = self::get_assignment_data($assignmentid);
+        } catch (\dml_missing_record_exception) {
+            // The assignment has vanished, nothing to do.
+            mtrace("No notification send as the assignment $assignmentid can no longer be found in the database.");
+            return;
+        }
 
         // Check if the due date still within range.
         $assignmentobj->update_effective_access($userid);
@@ -347,8 +353,14 @@ class notification_helper {
 
         $stringparams = [
             'firstname' => $user->firstname,
-            'assignmentname' => $assignmentobj->get_instance()->name,
-            'coursename' => $assignmentobj->get_course()->fullname,
+            'assignmentname' => format_string(
+                $assignmentobj->get_instance()->name,
+                options: ['context' => $assignmentobj->get_context()],
+            ),
+            'coursename' => format_string(
+                $assignmentobj->get_course()->fullname,
+                options: ['context' => $assignmentobj->get_course_context()],
+            ),
             'duedate' => userdate($duedate),
             'url' => $url,
         ];
@@ -357,8 +369,9 @@ class notification_helper {
             'user' => \core_user::get_user($user->id),
             'url' => $url->out(false),
             'subject' => get_string('assignmentduesoonsubject', 'mod_assign', $stringparams),
-            'assignmentname' => $assignmentobj->get_instance()->name,
+            'assignmentname' => $stringparams['assignmentname'],
             'html' => get_string('assignmentduesoonhtml', 'mod_assign', $stringparams),
+            'sms' => get_string('assignmentduesoonsms', 'mod_assign', $stringparams),
         ];
 
         $message = new \core\message\message();
@@ -370,6 +383,7 @@ class notification_helper {
         $message->fullmessageformat = FORMAT_HTML;
         $message->fullmessage = html_to_text($messagedata['html']);
         $message->fullmessagehtml = $messagedata['html'];
+        $message->fullmessagesms = $messagedata['sms'];
         $message->smallmessage = $messagedata['subject'];
         $message->notification = 1;
         $message->contexturl = $messagedata['url'];
@@ -390,8 +404,14 @@ class notification_helper {
      * @param int $userid The user id.
      */
     public static function send_overdue_notification_to_user(int $assignmentid, int $userid): void {
-        // Get assignment data.
-        $assignmentobj = self::get_assignment_data($assignmentid);
+        try {
+            // Get assignment data.
+            $assignmentobj = self::get_assignment_data($assignmentid);
+        } catch (\dml_missing_record_exception) {
+            // The assignment has vanished, nothing to do.
+            mtrace("No notification send as the assignment $assignmentid can no longer be found in the database.");
+            return;
+        }
 
         // Get the user and check they are a still a valid participant.
         $user = $assignmentobj->get_participant($userid);
@@ -433,8 +453,14 @@ class notification_helper {
 
         $stringparams = [
             'firstname' => $user->firstname,
-            'assignmentname' => $assignmentobj->get_instance()->name,
-            'coursename' => $assignmentobj->get_course()->fullname,
+            'assignmentname' => format_string(
+                $assignmentobj->get_instance()->name,
+                options: ['context' => $assignmentobj->get_context()],
+            ),
+            'coursename' => format_string(
+                $assignmentobj->get_course()->fullname,
+                options: ['context' => $assignmentobj->get_course_context()],
+            ),
             'duedate' => userdate($duedate),
             'url' => $url,
             'cutoffsnippet' => $snippet,
@@ -444,8 +470,9 @@ class notification_helper {
             'user' => \core_user::get_user($user->id),
             'url' => $url->out(false),
             'subject' => get_string('assignmentoverduesubject', 'mod_assign', $stringparams),
-            'assignmentname' => $assignmentobj->get_instance()->name,
+            'assignmentname' => $stringparams['assignmentname'],
             'html' => get_string('assignmentoverduehtml', 'mod_assign', $stringparams),
+            'sms' => get_string('assignmentoverduesms', 'mod_assign', $stringparams),
         ];
 
         $message = new \core\message\message();
@@ -457,6 +484,7 @@ class notification_helper {
         $message->fullmessageformat = FORMAT_HTML;
         $message->fullmessage = html_to_text($messagedata['html']);
         $message->fullmessagehtml = $messagedata['html'];
+        $message->fullmessagesms = $messagedata['sms'];
         $message->smallmessage = $messagedata['subject'];
         $message->notification = 1;
         $message->contexturl = $messagedata['url'];
@@ -490,6 +518,12 @@ class notification_helper {
                 continue;
             }
 
+            // Check if the module is visible to the user.
+            $cm = $assignmentobj->get_course_module();
+            if (!\core_availability\info_module::is_user_visible($cm, $userid)) {
+                continue;
+            }
+
             // Check if the due date is still within range.
             $assignmentobj->update_effective_access($userid);
             $duedate = $assignmentobj->get_instance($userid)->duedate;
@@ -509,8 +543,14 @@ class notification_helper {
                 'action' => 'view',
             ];
             $assignmentsfordigest[$assignment->id] = [
-                'assignmentname' => $assignmentobj->get_instance()->name,
-                'coursename' => $assignmentobj->get_course()->fullname,
+                'assignmentname' => format_string(
+                    $assignmentobj->get_instance()->name,
+                    options: ['context' => $assignmentobj->get_context()],
+                ),
+                'coursename' => format_string(
+                    $assignmentobj->get_course()->fullname,
+                    options: ['context' => $assignmentobj->get_course_context()],
+                ),
                 'duetime' => userdate($duedate, get_string('strftimetime12', 'langconfig')),
                 'url' => new \moodle_url('/mod/assign/view.php', $urlparams),
             ];
@@ -544,6 +584,7 @@ class notification_helper {
             'user' => $userobject,
             'subject' => get_string('assignmentduedigestsubject', 'mod_assign'),
             'html' => get_string('assignmentduedigesthtml', 'mod_assign', $stringparams),
+            'sms' => get_string('assignmentduedigestsms', 'mod_assign', $stringparams),
         ];
 
         $message = new \core\message\message();
@@ -555,6 +596,7 @@ class notification_helper {
         $message->fullmessageformat = FORMAT_HTML;
         $message->fullmessage = html_to_text($messagedata['html']);
         $message->fullmessagehtml = $messagedata['html'];
+        $message->fullmessagesms = $messagedata['sms'];
         $message->smallmessage = $messagedata['subject'];
         $message->notification = 1;
 

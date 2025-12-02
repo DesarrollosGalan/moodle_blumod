@@ -896,8 +896,12 @@ class core_course_external extends external_api {
                             'showreports' => new external_value(PARAM_INT,
                                     'are activity report shown (yes = 1, no =0)', VALUE_DEFAULT,
                                     $courseconfig->showreports),
-                            'visible' => new external_value(PARAM_INT,
-                                    '1: available to student, 0:not available', VALUE_OPTIONAL),
+                            'visible' => new external_value(
+                                PARAM_INT,
+                                '1: available to student, 0: not available',
+                                VALUE_DEFAULT,
+                                $courseconfig->visible,
+                            ),
                             'hiddensections' => new external_value(PARAM_INT,
                                     '(deprecated, use courseformatoptions) How the hidden sections in the course are displayed to students',
                                     VALUE_OPTIONAL),
@@ -951,6 +955,8 @@ class core_course_external extends external_api {
         $params = self::validate_parameters(self::create_courses_parameters(),
                         array('courses' => $courses));
 
+        $courseconfig = get_config('moodlecourse');
+
         $availablethemes = core_component::get_plugin_list('theme');
         $availablelangs = get_string_manager()->get_list_of_translations();
 
@@ -977,6 +983,14 @@ class core_course_external extends external_api {
                 throw new moodle_exception('errorinvalidparam', 'webservice', '', 'shortname');
             }
 
+            // Make sure start/end date are correctly set.
+            if (!array_key_exists('startdate', $course)) {
+                $course['startdate'] = usergetmidnight(time());
+            }
+            if (!array_key_exists('enddate', $course) && $courseconfig->courseenddateenabled) {
+                $course['enddate'] = $course['startdate'] + $courseconfig->courseduration;
+            }
+
             // Make sure lang is valid
             if (array_key_exists('lang', $course)) {
                 if (empty($availablelangs[$course['lang']])) {
@@ -998,6 +1012,8 @@ class core_course_external extends external_api {
                 }
             }
 
+            $course['showactivitydates'] = $courseconfig->showactivitydates;
+
             //force visibility if ws user doesn't have the permission to set it
             $category = $DB->get_record('course_categories', array('id' => $course['categoryid']));
             if (!has_capability('moodle/course:visibility', $context)) {
@@ -1005,7 +1021,6 @@ class core_course_external extends external_api {
             }
 
             //set default value for completion
-            $courseconfig = get_config('moodlecourse');
             if (completion_info::is_enabled_for_site()) {
                 if (!array_key_exists('enablecompletion', $course)) {
                     $course['enablecompletion'] = $courseconfig->enablecompletion;
@@ -3622,9 +3637,19 @@ class core_course_external extends external_api {
     }
 
     /**
+     * Mark the edit_module as deprecated.
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
+     * @return bool
+     */
+    public static function edit_module_is_deprecated() {
+        return true;
+    }
+
+    /**
      * Parameters for function edit_module()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return external_function_parameters
      */
     public static function edit_module_parameters() {
@@ -3647,7 +3672,8 @@ class core_course_external extends external_api {
      *
      * Throws exception if operation is not permitted/possible
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @param string $action
      * @param int $id
      * @param null|int $sectionreturn
@@ -3753,7 +3779,8 @@ class core_course_external extends external_api {
     /**
      * Return structure for edit_module()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return \core_external\external_description
      */
     public static function edit_module_returns() {
@@ -3761,9 +3788,19 @@ class core_course_external extends external_api {
     }
 
     /**
+     * Mark the get_module as deprecated.
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
+     * @return bool
+     */
+    public static function get_module_is_deprecated() {
+        return true;
+    }
+
+    /**
      * Parameters for function get_module()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return external_function_parameters
      */
     public static function get_module_parameters() {
@@ -3777,7 +3814,8 @@ class core_course_external extends external_api {
     /**
      * Returns html for displaying one activity module on course page
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @param int $id
      * @param null|int $sectionreturn
      * @return string
@@ -3819,7 +3857,8 @@ class core_course_external extends external_api {
     /**
      * Return structure for get_module()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return \core_external\external_description
      */
     public static function get_module_returns() {
@@ -3827,9 +3866,19 @@ class core_course_external extends external_api {
     }
 
     /**
+     * Mark the edit_section as deprecated.
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
+     * @return bool
+     */
+    public static function edit_section_is_deprecated() {
+        return true;
+    }
+
+    /**
      * Parameters for function edit_section()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return external_function_parameters
      */
     public static function edit_section_parameters() {
@@ -3844,7 +3893,8 @@ class core_course_external extends external_api {
     /**
      * Performs one of the edit section actions
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @param string $action
      * @param int $id section id
      * @param int $sectionreturn section to return to
@@ -3874,7 +3924,8 @@ class core_course_external extends external_api {
     /**
      * Return structure for edit_section()
      *
-     * @since Moodle 3.3
+     * @deprecated since 5.0
+     * @todo Remove this method in Moodle 6.0 (MDL-83530).
      * @return \core_external\external_description
      */
     public static function edit_section_returns() {
@@ -4266,7 +4317,7 @@ class core_course_external extends external_api {
 
         self::validate_context($usercontext);
 
-        if ($userid != $USER->id and !has_capability('moodle/user:viewdetails', $usercontext)) {
+        if ($userid != $USER->id && !has_capability('moodle/user:viewalldetails', $usercontext)) {
             return array();
         }
 
@@ -4316,21 +4367,27 @@ class core_course_external extends external_api {
      * @param int $groupid Group id from which the users will be obtained
      * @param bool $onlyactive Whether to return only the active enrolled users or all enrolled users in the course.
      * @return array List of users
-     * @throws invalid_parameter_exception
      */
     public static function get_enrolled_users_by_cmid(int $cmid, int $groupid = 0, bool $onlyactive = false) {
-    global $PAGE;
+        global $PAGE;
+
         $warnings = [];
 
-        self::validate_parameters(self::get_enrolled_users_by_cmid_parameters(), [
-                'cmid' => $cmid,
-                'groupid' => $groupid,
-                'onlyactive' => $onlyactive,
+        [
+            'cmid' => $cmid,
+            'groupid' => $groupid,
+            'onlyactive' => $onlyactive,
+        ] = self::validate_parameters(self::get_enrolled_users_by_cmid_parameters(), [
+            'cmid' => $cmid,
+            'groupid' => $groupid,
+            'onlyactive' => $onlyactive,
         ]);
 
         list($course, $cm) = get_course_and_cm_from_cmid($cmid);
         $coursecontext = context_course::instance($course->id);
         self::validate_context($coursecontext);
+
+        course_require_view_participants($coursecontext);
 
         $enrolledusers = get_enrolled_users($coursecontext, '', $groupid, 'u.*', null, 0, 0, $onlyactive);
 
@@ -4616,9 +4673,17 @@ class core_course_external extends external_api {
         $coursecontext = context_course::instance($courseid);
         self::validate_context($coursecontext);
 
-        $activeplugin = get_config('core', 'activitychooseractivefooter');
+        // The active plugin must be set, and be present on the site.
+        $activeplugin = clean_param(
+            get_config('core', 'activitychooseractivefooter'),
+            PARAM_COMPONENT,
+        );
 
-        if ($activeplugin !== COURSE_CHOOSER_FOOTER_NONE) {
+        if (
+            $activeplugin !== COURSE_CHOOSER_FOOTER_NONE &&
+            !empty($activeplugin) &&
+            core_component::get_component_directory($activeplugin) !== null
+        ) {
             $footerdata = component_callback($activeplugin, 'custom_chooser_footer', [$courseid, $sectionid]);
             return [
                 'footer' => true,

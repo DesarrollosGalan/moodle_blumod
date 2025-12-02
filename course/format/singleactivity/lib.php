@@ -49,7 +49,7 @@ class format_singleactivity extends core_courseformat\base {
      * @param array $options options for view URL. At the moment core uses:
      *     'navigation' (bool) ignored by this format
      *     'sr' (int) ignored by this format
-     * @return null|moodle_url
+     * @return moodle_url
      */
     public function get_view_url($section, $options = array()) {
         return new moodle_url('/course/view.php', ['id' => $this->courseid]);
@@ -290,6 +290,10 @@ class format_singleactivity extends core_courseformat\base {
             }
             foreach ($cmlist as $cmid) {
                 if ($sectionnum > 1) {
+                    // These module types cannot be moved from section 0.
+                    if (!$modinfo->cms[$cmid]->is_of_type_that_can_display()) {
+                        continue;
+                    }
                     moveto_module($modinfo->get_cm($cmid), $modinfo->get_section_info(1));
                 } else if (!$hasvisibleactivities && $sectionnum == 1 && $modinfo->get_cm($cmid)->visible) {
                     $hasvisibleactivities = true;
@@ -298,6 +302,10 @@ class format_singleactivity extends core_courseformat\base {
         }
         if (!empty($modinfo->sections[0])) {
             foreach ($modinfo->sections[0] as $cmid) {
+                // These module types cannot be moved from section 0.
+                if (!$modinfo->cms[$cmid]->is_of_type_that_can_display()) {
+                    continue;
+                }
                 if (!$activity || $cmid != $activity->id) {
                     moveto_module($modinfo->get_cm($cmid), $modinfo->get_section_info(1), $firstorphanedcm);
                 }

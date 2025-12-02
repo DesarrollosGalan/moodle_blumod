@@ -27,7 +27,7 @@ require_once($CFG->dirroot . '/lib/adminlib.php');
  * @copyright  2020 Catalyst IT
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @deprecated Since Moodle 4.5
- * @todo       MDL-82459 Final deprecation in Moodle 5.0.
+ * @todo       MDL-82459 Final deprecation in Moodle 6.0.
  */
 class admin_settings_aws_region extends \admin_setting_configtext {
 
@@ -45,7 +45,7 @@ class admin_settings_aws_region extends \admin_setting_configtext {
         mdl: 'MDL-80962',
     )]
     public function output_html($data, $query='') {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         global $CFG, $OUTPUT;
 
         $default = $this->get_defaultsetting();

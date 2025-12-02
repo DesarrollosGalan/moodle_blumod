@@ -142,16 +142,14 @@ class stateactions {
     }
 
     /**
-     * Move course sections to another location in the same course.
-     *
      * @deprecated since Moodle 4.4 MDL-77038.
-     * @todo MDL-80116 This will be deleted in Moodle 4.8.
-     * @param stateupdates $updates the affected course elements track
-     * @param stdClass $course the course object
-     * @param int[] $ids the list of affected course module ids
-     * @param int $targetsectionid optional target section id
-     * @param int $targetcmid optional target cm id
      */
+    #[\core\attribute\deprecated(
+        replacement: 'stateactions::section_move_after',
+        since: '4.4',
+        mdl: 'MDL-77038',
+        final: true,
+    )]
     public function section_move(
         stateupdates $updates,
         stdClass $course,
@@ -159,48 +157,7 @@ class stateactions {
         ?int $targetsectionid = null,
         ?int $targetcmid = null
     ): void {
-        debugging(
-            'The method stateactions::section_move() has been deprecated, please use stateactions::section_move_after() instead.',
-            DEBUG_DEVELOPER
-        );
-        // Validate target elements.
-        if (!$targetsectionid) {
-            throw new moodle_exception("Action cm_move requires targetsectionid");
-        }
-
-        $this->validate_sections($course, $ids, __FUNCTION__);
-
-        $coursecontext = context_course::instance($course->id);
-        require_capability('moodle/course:movesections', $coursecontext);
-
-        $modinfo = get_fast_modinfo($course);
-
-        // Target section.
-        $this->validate_sections($course, [$targetsectionid], __FUNCTION__);
-        $targetsection = $modinfo->get_section_info_by_id($targetsectionid, MUST_EXIST);
-
-        $affectedsections = [$targetsection->section => true];
-
-        $sections = $this->get_section_info($modinfo, $ids);
-        foreach ($sections as $section) {
-            $affectedsections[$section->section] = true;
-            move_section_to($course, $section->section, $targetsection->section);
-        }
-
-        // Use section_state to return the section and activities updated state.
-        $this->section_state($updates, $course, $ids, $targetsectionid);
-
-        // All course sections can be renamed because of the resort.
-        $allsections = $modinfo->get_section_info_all();
-        foreach ($allsections as $section) {
-            // Ignore the affected sections because they are already in the updates.
-            if (isset($affectedsections[$section->section])) {
-                continue;
-            }
-            $updates->add_section_put($section->id);
-        }
-        // The section order is at a course level.
-        $updates->add_course_put();
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -366,6 +323,9 @@ class stateactions {
             // We need to get the latest modinfo on each iteration because the section numbers change.
             $modinfo = get_fast_modinfo($course);
             $section = $modinfo->get_section_info_by_id($sectionid, MUST_EXIST);
+            if (!course_can_delete_section($course, $section)) {
+                continue;
+            }
             // Send all activity deletions.
             if (!empty($modinfo->sections[$section->section])) {
                 foreach ($modinfo->sections[$section->section] as $modnumber) {
@@ -540,14 +500,14 @@ class stateactions {
                 $coursevisible = ($allowstealth) ? 0 : 1;
             }
             set_coursemodule_visible($cm->id, $visible, $coursevisible, false);
-            $modcontext = context_module::instance($cm->id);
-            course_module_updated::create_from_cm($cm, $modcontext)->trigger();
         }
         course_modinfo::purge_course_modules_cache($course->id, $ids);
         rebuild_course_cache($course->id, false, true);
 
         $delegatedsections = [];
         foreach ($cms as $cm) {
+            $modcontext = context_module::instance($cm->id);
+            course_module_updated::create_from_cm($cm, $modcontext)->trigger();
             $updates->add_cm_put($cm->id);
             if (!$delegatedsection = $cm->get_delegated_section_info()) {
                 continue;
@@ -1184,12 +1144,19 @@ class stateactions {
     /**
      * Create a course module.
      *
+     * @deprecated since Moodle 5.0, use new_module instead.
+     * @todo MDL-83851: final deprecation of this method in Moodle 6.0.
      * @param stateupdates $updates the affected course elements track
      * @param stdClass $course the course object
      * @param string $modname the module name
      * @param int $targetsectionnum target section number
      * @param int|null $targetcmid optional target cm id
      */
+    #[\core\attribute\deprecated(
+        replacement: 'new_module',
+        since: '5.0',
+        mdl: 'MDL-83469',
+    )]
     public function create_module(
         stateupdates $updates,
         stdClass $course,
@@ -1199,6 +1166,8 @@ class stateactions {
     ): void {
         global $CFG;
         require_once($CFG->dirroot . '/course/modlib.php');
+
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
 
         $coursecontext = context_course::instance($course->id);
         require_capability('moodle/course:update', $coursecontext);

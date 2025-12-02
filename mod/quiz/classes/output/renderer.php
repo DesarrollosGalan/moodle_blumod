@@ -534,7 +534,7 @@ class renderer extends plugin_renderer_base {
      */
     public function during_attempt_tertiary_nav($quizviewurl): string {
         $output = '';
-        $output .= html_writer::start_div('container-fluid tertiary-navigation');
+        $output .= html_writer::start_div('tertiary-navigation');
         $output .= html_writer::start_div('row');
         $output .= html_writer::start_div('navitem');
         $output .= html_writer::link($quizviewurl, get_string('back'),
@@ -756,7 +756,7 @@ class renderer extends plugin_renderer_base {
     public function summary_table($attemptobj, $displayoptions) {
         // Prepare the summary table header.
         $table = new html_table();
-        $table->attributes['class'] = 'generaltable quizsummaryofattempt boxaligncenter';
+        $table->attributes['class'] = 'generaltable quizsummaryofattempt boxaligncenter table table-hover';
         $table->head = [get_string('question', 'quiz'), get_string('status', 'quiz')];
         $table->align = ['left', 'left'];
         $table->size = ['', ''];
@@ -923,16 +923,17 @@ class renderer extends plugin_renderer_base {
             $attemptbtn = $this->start_attempt_button($viewobj->buttontext,
                     $viewobj->startattempturl, $viewobj->preflightcheckform,
                     $viewobj->popuprequired, $viewobj->popupoptions);
-            $content .= $attemptbtn;
+            $content .= html_writer::div($attemptbtn, 'navitem');
         }
 
         if ($viewobj->canedit && !$viewobj->quizhasquestions) {
-            $content .= html_writer::link($viewobj->editurl, get_string('addquestion', 'quiz'),
+            $addquestionbutton = html_writer::link($viewobj->editurl, get_string('addquestion', 'quiz'),
                     ['class' => 'btn btn-secondary']);
+            $content .= html_writer::div($addquestionbutton, 'navitem');
         }
 
         if ($content) {
-            return html_writer::div(html_writer::div($content, 'row'), 'container-fluid tertiary-navigation');
+            return html_writer::div(html_writer::div($content, 'd-flex'), 'tertiary-navigation');
         } else {
             return '';
         }
@@ -1140,7 +1141,7 @@ class renderer extends plugin_renderer_base {
 
         // Prepare table header.
         $table = new html_table();
-        $table->attributes['class'] = 'generaltable quizattemptsummary';
+        $table->attributes['class'] = 'generaltable quizattemptsummary table table-hover';
         $table->caption = get_string('summaryofattempts', 'quiz');
         $table->captionhide = true;
         $table->head = [];

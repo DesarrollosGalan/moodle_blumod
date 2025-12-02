@@ -321,20 +321,6 @@ class completion_info {
     }
 
     /**
-     * @deprecated since Moodle 2.0 - Use display_help_icon instead.
-     */
-    public function print_help_icon() {
-        throw new coding_exception(__FUNCTION__ . '() has been removed.');
-    }
-
-    /**
-     * @deprecated since Moodle 4.0 - The 'Your progress' info isn't displayed any more.
-     */
-    public function display_help_icon() {
-        throw new coding_exception(__FUNCTION__ . '() has been removed.');
-    }
-
-    /**
      * Get a course completion for a user
      *
      * @param int $user_id User id
@@ -491,25 +477,24 @@ class completion_info {
     }
 
     /**
-     * @deprecated since Moodle 2.8 MDL-46290.
-     */
-    public function get_incomplete_criteria() {
-        throw new coding_exception('completion_info->get_incomplete_criteria() is removed.');
-    }
-
-    /**
      * Clear old course completion criteria
+     *
+     * @param bool $removetypecriteria Also remove course type criteria from other courses that refer to the current course
      */
-    public function clear_criteria() {
+    public function clear_criteria(bool $removetypecriteria = true): void {
         global $DB;
 
+        $select = 'course = :course';
+        $params = ['course' => $this->course->id];
+
         // Remove completion criteria records for the course itself, and any records that refer to the course.
-        $select = 'course = :course OR (criteriatype = :type AND courseinstance = :courseinstance)';
-        $params = [
-            'course' => $this->course_id,
-            'type' => COMPLETION_CRITERIA_TYPE_COURSE,
-            'courseinstance' => $this->course_id,
-        ];
+        if ($removetypecriteria) {
+            $select .= ' OR (criteriatype = :type AND courseinstance = :courseinstance)';
+            $params = array_merge($params, [
+                'type' => COMPLETION_CRITERIA_TYPE_COURSE,
+                'courseinstance' => $this->course_id,
+            ]);
+        }
 
         $DB->delete_records_select('course_completion_criteria', $select, $params);
         $DB->delete_records('course_completion_aggr_methd', array('course' => $this->course_id));
@@ -623,12 +608,6 @@ class completion_info {
             return;
         }
 
-        // The activity completion alters the course state cache for this particular user.
-        $course = get_course($cm->course);
-        if ($course) {
-            course_format::session_cache_reset($course);
-        }
-
         // For auto tracking, if the status is overridden to 'COMPLETION_COMPLETE', then disallow further changes,
         // unless processing another override.
         // Basically, we want those activities which have been overridden to COMPLETE to hold state, and those which have been
@@ -659,6 +638,19 @@ class completion_info {
             $current->timemodified    = time();
             $current->overrideby      = $override ? $USER->id : null;
             $this->internal_set_data($cm, $current, $isbulkupdate);
+
+            // Dispatch the hook for course content update.
+            // The activity completion alters the course state cache for this particular user.
+            $course = get_course($cm->course);
+            if ($course) {
+                $modinfo = get_fast_modinfo($course);
+                $cminfo = $modinfo->get_cm($cm->id);
+                $hook = new \core_completion\hook\after_cm_completion_updated(
+                    cm: $cminfo,
+                    data: $current,
+                );
+                \core\di::get(\core\hook\manager::class)->dispatch($hook);
+            }
         }
     }
 

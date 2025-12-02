@@ -183,6 +183,8 @@ final class lib_test extends \advanced_testcase {
 
         $now = time();
         $course = $this->getDataGenerator()->create_course();
+        // Enrol admin as a student so they can complete the feedback.
+        $this->getDataGenerator()->enrol_user(get_admin()->id, $course->id, 'student');
         $feedback = $this->getDataGenerator()->create_module('feedback', ['course' => $course->id,
                 'timeopen' => $now - DAYSECS, 'timeclose' => $now + DAYSECS]);
         $event = $this->create_action_event($course->id, $feedback->id, FEEDBACK_EVENT_TYPE_OPEN);
@@ -294,6 +296,8 @@ final class lib_test extends \advanced_testcase {
         $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
+        // Enrol admin as a student so they can complete the feedback.
+        $this->getDataGenerator()->enrol_user(get_admin()->id, $course->id, 'student');
         $feedback = $this->getDataGenerator()->create_module('feedback', ['course' => $course->id,
                 'timeopen' => time() + DAYSECS]);
         $event = $this->create_action_event($course->id, $feedback->id, FEEDBACK_EVENT_TYPE_OPEN);
@@ -356,6 +360,8 @@ final class lib_test extends \advanced_testcase {
         $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
+        // Enrol admin as a student so they can complete the feedback.
+        $this->getDataGenerator()->enrol_user(get_admin()->id, $course->id, 'student');
         $feedback = $this->getDataGenerator()->create_module('feedback', ['course' => $course->id]);
         $event = $this->create_action_event($course->id, $feedback->id, FEEDBACK_EVENT_TYPE_OPEN);
 
@@ -1162,5 +1168,51 @@ final class lib_test extends \advanced_testcase {
             'timeclose' => $time + 2000,
         );
         $generator->create_instance($params);
+    }
+
+    /**
+     * Test that if a teacher (non editing) is not part of any group in separate group mode he will not receive notification emails.
+     * @covers ::feedback_get_receivemail_users
+     */
+    public function test_feedback_get_receivemail_users(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['groupmode' => SEPARATEGROUPS, 'groupmodeforce' => 1]);
+        $group = $generator->create_group(['courseid' => $course->id, 'name' => 'group0']);
+
+        $feedbackgenerator = $generator->get_plugin_generator('mod_feedback');
+        $feedback = $feedbackgenerator->create_instance(['course' => $course->id, 'email_notification' => true]);
+        $teacher = [];
+        $data = [
+            'teacher1' => 'teacher',
+            'teacher2' => 'teacher',
+            'teacher3' => 'editingteacher',
+            'teacher4' => 'editingteacher',
+        ];
+        foreach ($data as $username => $role) {
+            $teacher[$username] = $generator->create_user(['username' => $username]);
+            $generator->enrol_user($teacher[$username]->id, $course->id, $role);
+        }
+        $generator->create_group_member([
+            'groupid' => $group->id,
+            'userid' => $teacher['teacher1']->id,
+        ]);
+        $generator->create_group_member([
+            'groupid' => $group->id,
+            'userid' => $teacher['teacher4']->id,
+        ]);
+
+        $usergroup = $group->id;
+        // Non editing Teachers (teacher1) in a group should receive notification emails.
+        // Editing teachers (teacher4), in a group should also receive notification emails.
+        $teachersingroup = feedback_get_receivemail_users($feedback->cmid, $usergroup);
+        $this->assertCount(2, $teachersingroup);
+        $this->assertNotEmpty($teachersingroup[$teacher['teacher1']->id]);
+        $this->assertNotEmpty($teachersingroup[$teacher['teacher4']->id]);
+        // Here we should return only the editing teachers (teacher3 and 4) who have access to all groups.
+        $teacherwithnogroup = feedback_get_receivemail_users($feedback->cmid);
+        $this->assertCount(2, $teacherwithnogroup);
+        $this->assertNotEmpty($teacherwithnogroup[$teacher['teacher3']->id]);
+        $this->assertNotEmpty($teacherwithnogroup[$teacher['teacher4']->id]);
     }
 }

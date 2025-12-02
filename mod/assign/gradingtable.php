@@ -109,7 +109,7 @@ class assign_grading_table extends table_sql implements renderable {
         $this->define_baseurl($url);
 
         // Do some business - then set the sql.
-        $currentgroup = groups_get_activity_group($assignment->get_course_module(), true);
+        $currentgroup = groups_get_activity_group($assignment->get_course_module(), true, participationonly: false);
 
         if ($rowoffset) {
             $this->rownum = $rowoffset - 1;
@@ -321,6 +321,11 @@ class assign_grading_table extends table_sql implements renderable {
                 $where .= '))';
                 $params['submitted'] = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
 
+            } else if ($filter == ASSIGN_FILTER_GRADED) {
+                $where .= ' AND (s.timemodified IS NOT NULL AND
+                                 s.timemodified < g.timemodified AND g.grade IS NOT NULL)';
+                $params['submitted'] = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
+
             } else if ($filter == ASSIGN_FILTER_GRANTED_EXTENSION) {
                 $where .= ' AND uf.extensionduedate > 0 ';
 
@@ -378,9 +383,24 @@ class assign_grading_table extends table_sql implements renderable {
         // Select.
         if (!$this->is_downloading() && $this->hasgrade) {
             $columns[] = 'select';
-            $headers[] = get_string('select') .
-                    '<div class="selectall"><label class="accesshide" for="selectall">' . get_string('selectall') . '</label>
-                    <input type="checkbox" id="selectall" name="selectall" title="' . get_string('selectall') . '"/></div>';
+            // The displayed text for the column header. Hidden to assistive technologies.
+            $visibleheader = html_writer::span(get_string('select'), '', ['aria-hidden' => 'true']);
+            // The actual accessible name for the column header which provides more context about the column's purpose to
+            // screen reader users.
+            $bulkactionsselection = html_writer::span(get_string('bulkactionsselection', 'assign'), 'visually-hidden');
+
+            // The select all checkbox.
+            $selectalllabel = html_writer::label(get_string('selectall'), 'selectall', false, ['class' => 'visually-hidden']);
+            $selectallcheckbox = html_writer::empty_tag(
+                'input',
+                [
+                    'type' => 'checkbox',
+                    'id' => 'selectall',
+                    'name' => 'selectall',
+                ],
+            );
+            $headers[] = $visibleheader . $bulkactionsselection .
+                html_writer::div($selectalllabel . $selectallcheckbox, 'selectall');
         }
 
         if ($this->hasviewblind || !$this->assignment->is_blind_marking()) {
@@ -753,9 +773,10 @@ class assign_grading_table extends table_sql implements renderable {
      * @param boolean $editable
      * @param int $userid The user id of the user this grade belongs to
      * @param int $modified Timestamp showing when the grade was last modified
+     * @param float $deductedmark The deducted mark if penalty is applied
      * @return string The formatted grade
      */
-    public function display_grade($grade, $editable, $userid, $modified) {
+    public function display_grade($grade, $editable, $userid, $modified, float $deductedmark = 0) {
         if ($this->is_downloading()) {
             if ($this->assignment->get_instance()->grade >= 0) {
                 if ($grade == -1 || $grade === null) {
@@ -772,7 +793,7 @@ class assign_grading_table extends table_sql implements renderable {
                 return $scale;
             }
         }
-        return $this->assignment->display_grade($grade, $editable, $userid, $modified);
+        return $this->assignment->display_grade($grade, $editable, $userid, $modified, $deductedmark);
     }
 
     /**
@@ -881,7 +902,7 @@ class assign_grading_table extends table_sql implements renderable {
         reason: 'Picture column is merged with fullname column'
     )]
     public function col_picture(stdClass $row) {
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         return $this->output->user_picture($row);
     }
 
@@ -1035,7 +1056,7 @@ class assign_grading_table extends table_sql implements renderable {
 
         $grade = $this->get_gradebook_data_for_user($row->userid);
         if ($grade) {
-            $o = $this->display_grade($grade->grade, false, $row->userid, $row->timemarked);
+            $o = $this->display_grade($grade->grade, false, $row->userid, $row->timemarked, $grade->deductedmark);
         }
 
         return $o;
@@ -1359,7 +1380,7 @@ class assign_grading_table extends table_sql implements renderable {
     public function col_userid(stdClass $row) {
         global $USER;
 
-        \core\deprecation::emit_deprecation_if_present([$this, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
         $edit = '';
 
         $actions = array();
@@ -1928,7 +1949,7 @@ class assign_grading_table extends table_sql implements renderable {
         // Start of main data table.
 
         if ($this->responsive) {
-            echo html_writer::start_tag('div', ['class' => 'no-overflow']);
+            echo html_writer::start_tag('div', ['class' => 'table-responsive']);
         }
         echo html_writer::start_tag('table', $this->attributes) . $this->render_caption();
     }

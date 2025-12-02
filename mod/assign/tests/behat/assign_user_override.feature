@@ -83,6 +83,30 @@ Feature: Assign user override
     And the activity date in "Test assignment name" should contain "Due: Wednesday, 1 January 2020, 8:00"
 
   @javascript
+  Scenario: Ensure an overridden due date is before any extension date
+    Given I am on the "Test assignment name" Activity page logged in as teacher1
+    When I navigate to "Settings" in current page administration
+    And I set the field "Due date" to "##1 Jan 2000 08:00##"
+    And I press "Save and display"
+    And I navigate to "Submissions" in current page administration
+    And I open the action menu in "Student1" "table_row"
+    And I follow "Grant extension"
+    And I set the field "Extension due date" to "##3 Jan 2000 08:00##"
+    And I press "Save changes"
+    And I navigate to "Overrides" in current page administration
+    And I press "Add user override"
+    And I set the following fields to these values:
+      | Override user | Student1             |
+      | Due date      | ##4 Jan 2000 08:00## |
+    And I press "Save"
+    Then I should see "Extension date must be after the due date"
+    And I set the field "Due date" to "##2 Jan 2000 08:00##"
+    And I press "Save"
+    And the following should exist in the "generaltable" table:
+      | User          | Overrides | -3-                          |
+      | Sam1 Student1 | Due date  | Sunday, 2 January 2000, 8:00 |
+
+  @javascript
   Scenario: Allow a user to have a different cut off date
     Given I am on the "Test assignment name" Activity page logged in as teacher1
     When I navigate to "Settings" in current page administration
@@ -220,3 +244,53 @@ Feature: Assign user override
     And "Edit" "icon" should exist in the "Sam1 Student1" "table_row"
     And "copy" "icon" should exist in the "Sam1 Student1" "table_row"
     And "Delete" "icon" should exist in the "Sam1 Student1" "table_row"
+
+  @javascript
+  Scenario: Teachers can trigger grade penalty recalculation when modifying or deleting user overrides
+    Given I enable grade penalties for assignment
+    And the following "activity" exists:
+      | activity                             | assign                      |
+      | course                               | C1                          |
+      | name                                 | Test assignment penalty     |
+      | intro                                | Test assignment description |
+      | grade                                | 100                         |
+      | duedate                              | ##tomorrow##                |
+      | gradepenalty                         | 1                           |
+      | assignsubmission_onlinetext_enabled  | 1                           |
+      | submissiondrafts                     | 0                           |
+    And the following "mod_assign > submissions" exist:
+      | assign                | user      | onlinetext                        |
+      | Test assignment name  | student1  | I'm the student first submission  |
+    # Add a user override with a due date set in the future.
+    And I am on the "Test assignment penalty" Activity page logged in as teacher1
+    And I navigate to "Overrides > Add user override" in current page administration
+    And I set the following fields to these values:
+      | Override user  | Student1           |
+      | Due date       | ##tomorrow +1day## |
+    And I press "Save"
+    And I change window size to "large"
+    And I go to "Sam1 Student1" "Test assignment penalty" activity advanced grading page
+    And I set the field "Grade out of 100" to "90"
+    And I set the field "Notify student" to "0"
+    And I press "Save changes"
+    And I follow "View all submissions"
+    And "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "90.00"
+    # Modify the user override by changing the due date to a past date.
+    And I navigate to "Overrides" in current page administration
+    And I click on "Edit" "link" in the "Sam1 Student1" "table_row"
+    When I set the following fields to these values:
+      | Recalculate penalty   | Yes                |
+      | Due date              | ##yesterday##      |
+    And I press "Save"
+    And I navigate to "Submissions" in current page administration
+    Then "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "80.00"
+    # Delete the user override.
+    And I navigate to "Overrides" in current page administration
+    And I click on "Delete" "link" in the "Sam1 Student1" "table_row"
+    And I click on "Recalculate penalty for user(s) in the override" "checkbox" in the "Confirm" "dialogue"
+    And I click on "Continue" "button" in the "Confirm" "dialogue"
+    And I navigate to "Submissions" in current page administration
+    And "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "90.00"

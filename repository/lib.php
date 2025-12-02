@@ -536,6 +536,9 @@ abstract class repository implements cacheable_object {
     /** @var bool true if the super construct is called, otherwise false. */
     public $super_called;
 
+    /** @var array List of file ids currently being synced, to avoid endless recursion */
+    protected static $syncfileids = [];
+
     /**
      * Constructor
      *
@@ -1785,32 +1788,11 @@ abstract class repository implements cacheable_object {
     }
 
     /**
-     * Return size of a file in bytes.
-     *
-     * @param string $source encoded and serialized data of file
-     * @return int file size in bytes
-     *
      * @deprecated since Moodle 4.3
      */
-    public function get_file_size($source) {
-        debugging(__FUNCTION__ . ' is deprecated, please do not use it any more', DEBUG_DEVELOPER);
-
-        $browser    = get_file_browser();
-        $params     = unserialize(base64_decode($source));
-        $contextid  = clean_param($params['contextid'], PARAM_INT);
-        $fileitemid = clean_param($params['itemid'], PARAM_INT);
-        $filename   = clean_param($params['filename'], PARAM_FILE);
-        $filepath   = clean_param($params['filepath'], PARAM_PATH);
-        $filearea   = clean_param($params['filearea'], PARAM_AREA);
-        $component  = clean_param($params['component'], PARAM_COMPONENT);
-        $context    = context::instance_by_id($contextid);
-        $file_info  = $browser->get_file_info($context, $component, $filearea, $fileitemid, $filepath, $filename);
-        if (!empty($file_info)) {
-            $filesize = $file_info->get_filesize();
-        } else {
-            $filesize = null;
-        }
-        return $filesize;
+    #[\core\attribute\deprecated(null, reason: 'No longer used', since: '4.3', mdl: 'MDL-50272', final: true)]
+    public function get_file_size() {
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -2698,25 +2680,6 @@ abstract class repository implements cacheable_object {
     }
 
     /**
-     * Function repository::reset_caches() is deprecated, cache is handled by MUC now.
-     * @deprecated since Moodle 2.6 MDL-42016 - please do not use this function any more.
-     */
-    public static function reset_caches() {
-        throw new coding_exception('Function repository::reset_caches() can not be used any more, cache is handled by MUC now.');
-    }
-
-    /**
-     * Function repository::sync_external_file() is deprecated. Use repository::sync_reference instead
-     *
-     * @deprecated since Moodle 2.6 MDL-42016 - please do not use this function any more.
-     * @see repository::sync_reference()
-     */
-    public static function sync_external_file($file, $resetsynchistory = false) {
-        throw new coding_exception('Function repository::sync_external_file() can not be used any more. ' .
-            'Use repository::sync_reference instead.');
-    }
-
-    /**
      * Performs synchronisation of an external file if the previous one has expired.
      *
      * This function must be implemented for external repositories supporting
@@ -2759,14 +2722,29 @@ abstract class repository implements cacheable_object {
             if ($file->get_referencelastsync()) {
                 return false;
             }
-            $fs = get_file_storage();
-            $params = file_storage::unpack_reference($file->get_reference(), true);
-            if (!is_array($params) || !($storedfile = $fs->get_file($params['contextid'],
-                    $params['component'], $params['filearea'], $params['itemid'], $params['filepath'],
-                    $params['filename']))) {
-                $file->set_missingsource();
-            } else {
-                $file->set_synchronized($storedfile->get_contenthash(), $storedfile->get_filesize(), 0, $storedfile->get_timemodified());
+
+            if (in_array($file->get_id(), self::$syncfileids)) {
+                throw new \coding_exception('File references itself: ' . $file->get_id());
+            }
+            try {
+                array_push(self::$syncfileids, $file->get_id());
+
+                $fs = get_file_storage();
+                $params = file_storage::unpack_reference($file->get_reference(), true);
+                if (!is_array($params) || !($storedfile = $fs->get_file($params['contextid'],
+                        $params['component'], $params['filearea'], $params['itemid'], $params['filepath'],
+                        $params['filename']))) {
+                    $file->set_missingsource();
+                } else {
+                    $file->set_synchronized(
+                        $storedfile->get_contenthash(),
+                        $storedfile->get_filesize(),
+                        0,
+                        $storedfile->get_timemodified(),
+                    );
+                }
+            } finally {
+                array_pop(self::$syncfileids);
             }
             return true;
         }

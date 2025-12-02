@@ -114,19 +114,6 @@ class mysql_sql_generator extends sql_generator {
     }
 
     /**
-     * Calculate proximate row size when using InnoDB
-     * tables in Antelope row format.
-     *
-     * Note: the returned value is a bit higher to compensate for
-     *       errors and changes of column data types.
-     *
-     * @deprecated since Moodle 2.9 MDL-49723 - please do not use this function any more.
-     */
-    public function guess_antolope_row_size(array $columns) {
-        throw new coding_exception('guess_antolope_row_size() can not be used any more, please use guess_antelope_row_size() instead.');
-    }
-
-    /**
      * Calculate proximate row size when using InnoDB tables in Antelope row format.
      *
      * Note: the returned value is a bit higher to compensate for errors and changes of column data types.
@@ -642,6 +629,9 @@ class mysql_sql_generator extends sql_generator {
             // Added in Amazon Aurora MySQL version 3.06.0:
             // https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.3060.html .
             'accept', 'aws_bedrock_invoke_model', 'aws_sagemaker_invoke_endpoint', 'content_type', 'timeout_ms',
+            // Added in MySQL 8.4:
+            // https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html.
+            'auto', 'bernoulli', 'gtids', 'log', 'manual', 'parallel', 'parse_tree', 'qualify', 's3', 'tablesample',
         );
         return $reserved_words;
     }

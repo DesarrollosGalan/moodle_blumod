@@ -150,6 +150,14 @@
     background: url([[pix:quiz|navflagged]]) no-repeat top right;
 }
 
+.qnbutton.flagged .thispageholder {
+    background: transparent url([[pix:quiz|flag-on]]) 15px 0 no-repeat;
+}
+
+.qnbutton.invalidanswer .trafficlight {
+    background-image: url([[pix:quiz|warningtriangle]]) !important; /* stylelint-disable-line declaration-no-important */
+}
+
 .path-mod-quiz .qnbutton.blocked,
 .path-mod-quiz .qnbutton.notyetanswered,
 .path-mod-quiz .qnbutton.requiresgrading,
@@ -298,6 +306,12 @@ body.path-mod-quiz table tbody tr.gradedattempt > td.sticky-column {
     background-color: #d9edf7;
 }
 
+body.path-mod-quiz table tbody tr > td.sticky-column,
+body.path-mod-quiz table thead tr > th.sticky-column,
+body.path-mod-quiz table tbody tr:not(.gradedattempt):hover td.sticky-column {
+    background-color: #fff;
+}
+
 /** Mod quiz summary **/
 #page-mod-quiz-summary #content {
     text-align: center;
@@ -310,11 +324,6 @@ body.path-mod-quiz table tbody tr.gradedattempt > td.sticky-column {
 
 #page-mod-quiz-summary .submitbtns {
     margin-top: 1.5em;
-}
-
-#page-mod-quiz-edit .section .activity .actions .version-selection {
-    width: 8em;
-    padding: 0;
 }
 
 @media print {
@@ -532,10 +541,6 @@ table.quizreviewsummary td.cell {
 #page-mod-quiz-edit .slotnumber {
     text-align: center;
     margin: 0.1em 0.5em;
-    min-width: 2em;
-    display: inline-block;
-}
-#page-mod-quiz-edit li.section .slotnumber.unshuffled {
     display: inline-block;
 }
 #page-mod-quiz-edit li.section .slotnumber.shuffled {
@@ -546,6 +551,10 @@ table.quizreviewsummary td.cell {
 }
 #page-mod-quiz-edit li.section.shuffled .slotnumber.shuffled {
     display: inline-block;
+}
+
+#page-mod-quiz-edit .slotnumber .inplaceeditable {
+    white-space: nowrap;
 }
 
 #page-mod-quiz-edit .section-heading {
@@ -634,6 +643,14 @@ table.quizreviewsummary td.cell {
     margin: 3px 0;
     padding: 0.2em;
     position: relative;
+}
+
+#page-mod-quiz-edit ul.slots li.section li.activity.qtype_missingtype {
+    background-color: #f0c5c1;
+}
+
+#page-mod-quiz-edit ul.slots li.section li.activity.qtype_missingtype .actions {
+    background-color: inherit;
 }
 
 #page-mod-quiz-edit ul.slots li.section li.activity.page {
@@ -735,6 +752,7 @@ table.quizreviewsummary td.cell {
 
 #page-mod-quiz-edit ul.slots li.section li.activity .activityinstance {
     display: flex;
+    flex-wrap: wrap;
     flex: 1 1 auto;
     min-height: 1.7em;
     padding-right: 2px;
@@ -756,10 +774,7 @@ table.quizreviewsummary td.cell {
 #page-mod-quiz-edit ul.slots .activityinstance span.instancename {
     overflow-x: hidden;
     overflow-y: hidden;
-    white-space: nowrap;
     text-overflow: ellipsis;
-    display: inline-block;
-    height: 20px;
 }
 
 #page-mod-quiz-edit ul.slots .activityinstance span.instancename img {
@@ -772,11 +787,14 @@ table.quizreviewsummary td.cell {
     color: #555;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 #page-mod-quiz-edit ul.slots li.activity div.activityinstance .questiontext {
     color: #555;
+}
+
+#page-mod-quiz-edit .sharedbank .badge {
+    white-space: initial;
 }
 
 #page-mod-quiz-edit .section .activity .editing_move {
@@ -804,6 +822,8 @@ table.quizreviewsummary td.cell {
     white-space: nowrap;
     background: #e6e6e6;
     padding: 0.1em 0;
+    display: flex;
+    align-items: baseline;
 }
 
 #page-mod-quiz-edit .mod_quiz_edit_forms {
@@ -1084,23 +1104,23 @@ table.quizreviewsummary td.cell {
     text-align: right;
 }
 #page-mod-quiz-editgrading .inplaceeditable .quickeditlink {
-    color: var(--primary);
+    color: var(--bs-primary);
 }
 #page-mod-quiz-edit .inplaceeditable .quickeditlink {
-    color: var(--primary);
+    color: var(--bs-primary);
     text-decoration: none;
     background-color: transparent;
     padding-left: 1px;
     margin: 0;
 }
 #page-mod-quiz-edit .quickeditlink .aalink {
-    color: var(--primary);
+    color: var(--bs-primary);
     text-align: right;
     width: 10px;
     margin: 2px;
 }
 #page-mod-quiz-edit .quickedition {
-    color: var(--primary);
+    color: var(--bs-primary);
     text-align: right;
     width: 10px;
     margin: 2px;
@@ -1113,17 +1133,15 @@ table.quizreviewsummary td.cell {
 }
 
 @media (max-width: 576px) {
-    #page-mod-quiz-edit ul.slots li.section li.activity {
-        padding-top: 30px;
+    #page-mod-quiz-edit ul.slots li.section li.activity .mod-indent {
+        display: none;
     }
-    #page-mod-quiz-edit ul.slots li.section li.activity .activityinstance {
-        top: -30px;
-        left: 0;
-        padding-right: 0;
-        overflow: hidden;
-        align-items: center;
-        position: absolute;
-        width: 100%;
+    #page-mod-quiz-edit ul.slots li.section li.activity .mod-indent-outer,
+    #page-mod-quiz-edit li.section .slotnumber.unshuffled,
+    #page-mod-quiz-edit li.section.shuffled .slotnumber.shuffled,
+    #page-mod-quiz-edit ul.slots li.section li.activity .activityinstance,
+    #page-mod-quiz-edit ul.slots li.section li.activity .actions {
+        display: block;
     }
 }
 

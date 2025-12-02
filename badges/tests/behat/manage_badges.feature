@@ -12,7 +12,6 @@ Feature: Manage badges
       | language       | en                           |
       | description    | Test badge description       |
       | image          | badges/tests/behat/badge.png |
-      | imageauthorurl | http://author.example.com    |
       | imagecaption   | Test caption image           |
 
   Scenario: Copy a badge
@@ -118,6 +117,7 @@ Feature: Manage badges
       | Admin User |
       | User One   |
 
+  @accessibility
   Scenario: View list of badges with recipients
     Given the following "users" exist:
       | username | firstname | lastname |
@@ -139,6 +139,7 @@ Feature: Manage badges
       | Badge #1 | Not available | 2          |
       | Badge #2 | Available     | 1          |
       | Badge #3 | Available     | 0          |
+    And the "Badges" "table" should meet accessibility standards with "best-practice" extra tests
 
   @_file_upload
   Scenario: Badge names are not unique anymore
@@ -154,7 +155,6 @@ Feature: Manage badges
       | language       | en                           |
       | description    | Test badge description       |
       | image          | badges/tests/behat/badge.png |
-      | imageauthorurl | http://author.example.com    |
       | imagecaption   | Test caption image           |
     And I log in as "admin"
     And I navigate to "Badges > Add a new badge" in site administration

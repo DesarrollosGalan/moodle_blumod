@@ -1391,38 +1391,6 @@ final class upgradelib_test extends advanced_testcase {
     }
 
     /**
-     * Test the check_oracle_usage check when the Moodle instance is not using Oracle as a database architecture.
-     *
-     * @covers ::check_oracle_usage
-     */
-    public function test_check_oracle_usage_is_not_used(): void {
-        global $CFG;
-
-        $this->resetAfterTest();
-        $CFG->dbtype = 'pgsql';
-
-        $result = new environment_results('custom_checks');
-        $this->assertNull(check_oracle_usage($result));
-    }
-
-    /**
-     * Test the check_oracle_usage check when the Moodle instance is using Oracle as a database architecture.
-     *
-     * @covers ::check_oracle_usage
-     */
-    public function test_check_oracle_usage_is_used(): void {
-        global $CFG;
-
-        $this->resetAfterTest();
-        $CFG->dbtype = 'oci';
-
-        $result = new environment_results('custom_checks');
-        $this->assertInstanceOf(environment_results::class, check_oracle_usage($result));
-        $this->assertEquals('oracle_database_usage', $result->getInfo());
-        $this->assertFalse($result->getStatus());
-    }
-
-    /**
      * Data provider of usermenu items.
      *
      * @return array
@@ -1762,5 +1730,37 @@ calendar,core_calendar|/calendar/view.php?view=month',
         upgrade_store_relative_url_sitehomepage();
         $this->assertEquals('/page2', get_user_preferences('user_home_page_preference', null, $user1->id));
         $this->assertEquals(HOMEPAGE_MY, get_user_preferences('user_home_page_preference', null, $user2->id));
+    }
+
+    /**
+     * Test the check_aurora_version check when the Moodle instance is not using Amazon Aurora as a database architecture.
+     *
+     * @covers ::check_aurora_version
+     */
+    public function test_check_aurora_version_is_not_used(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $CFG->dbtype = 'pgsql';
+
+        $result = new environment_results('custom_checks');
+        $this->assertNull(check_aurora_version($result));
+    }
+
+    /**
+     * Test the check_aurora_version check when the Moodle instance is using Amazon Aurora as a database architecture.
+     *
+     * @covers ::check_aurora_version
+     */
+    public function test_check_aurora_version_is_used(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $CFG->dbtype = 'auroramysql';
+
+        $result = new environment_results('custom_checks');
+        $this->assertInstanceOf(environment_results::class, check_aurora_version($result));
+        $this->assertEquals('Aurora compatibility', $result->getInfo());
+        $this->assertFalse($result->getStatus());
     }
 }

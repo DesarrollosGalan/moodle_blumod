@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings for component 'scorm', language 'en'
+ * Strings for component 'mod_scorm', language 'en'
  *
  * @package   mod_scorm
  * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
@@ -36,6 +36,7 @@ $string['activitypleasewait'] = 'Activity loading, please wait ...';
 $string['adminsettings'] = 'Admin settings';
 $string['advanced'] = 'Parameters';
 $string['aliasonly'] = 'When selecting an imsmanifest.xml file from a repository you must use an alias/shortcut for this file.';
+$string['allattempts'] = 'All SCORM attempts';
 $string['allowapidebug'] = 'Activate API debug and tracing (set the capture mask with apidebugmask)';
 $string['allowtypeexternal'] = 'Enable external package type';
 $string['allowtypeexternalaicc'] = 'Enable direct AICC URL';
@@ -58,7 +59,7 @@ $string['attemptsmanagement'] = 'Attempts management';
 $string['attempt1'] = '1 attempt';
 $string['attr_error'] = 'Bad value for attribute ({$a->attr}) in tag {$a->tag}.';
 $string['autocommit'] = 'Auto-commit';
-$string['autocommit_help'] = 'If enabled, SCORM data is automaticaly saved to the database. Useful for SCORM objects which do not save their data regularly.';
+$string['autocommit_help'] = 'If enabled, SCORM data is automatically saved to the database. This is useful for SCORM objects which do not save their data regularly.';
 $string['autocommitdesc'] = 'Automatically save SCORM data if the SCORM package does not save it.';
 $string['autocontinue'] = 'Auto-continue';
 $string['autocontinue_help'] = 'If enabled, subsequent learning objects are launched automatically, otherwise the Continue button must be used.';
@@ -107,7 +108,7 @@ $string['defaultdisplaysettings'] = 'Default display settings';
 $string['defaultgradesettings'] = 'Default grade settings';
 $string['defaultothersettings'] = 'Other default settings';
 $string['deleteattemptcheck'] = 'Are you absolutely sure you want to completely delete these attempts?';
-$string['deleteallattempts'] = 'All SCORM attempts';
+$string['deleteallattempts'] = 'Delete all SCORM attempts';
 $string['deleteselected'] = 'Delete selected attempts';
 $string['deleteuserattemptcheck'] = 'Are you absolutely sure you want to completely delete all your attempts?';
 $string['details'] = 'Track details';
@@ -455,6 +456,3 @@ $string['whatgradedesc'] = 'Whether the highest, average (mean), first or last c
 $string['width'] = 'Width';
 $string['window'] = 'Window';
 $string['youmustselectastatus'] = 'You must select a status to require';
-
-// Deprecated since Moodle 4.3.
-$string['completionscorerequired_help'] = 'Enabling this setting will require a user to have at least the minimum score entered to be marked complete in this SCORM activity, as well as any other Activity Completion requirements.';

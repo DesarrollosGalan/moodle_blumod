@@ -33,6 +33,7 @@ Feature: Assign group override
       | activity | name                 | intro                   | course | assignsubmission_onlinetext_enabled |
       | assign   | Test assignment name | Submit your online text | C1     | 1                                   |
 
+  @javascript
   Scenario: Add, modify then delete a group override
     Given I am on the "Test assignment name" Activity page logged in as teacher1
     When I navigate to "Overrides" in current page administration
@@ -257,3 +258,156 @@ Feature: Assign group override
     And I should see "Only visible to members/Non-Participation" in the "Override group" "select"
     And I should see "Only see own membership" in the "Override group" "select"
     And I should not see "Not visible" in the "Override group" "select"
+
+  @javascript
+  Scenario: Teachers can trigger grade penalty recalculation when modifying or deleting group overrides
+    Given I enable grade penalties for assignment
+    And the following "activity" exists:
+      | activity                             | assign                      |
+      | course                               | C1                          |
+      | name                                 | Test assignment penalty     |
+      | intro                                | Test assignment description |
+      | grade                                | 100                         |
+      | duedate                              | ##tomorrow##                |
+      | gradepenalty                         | 1                           |
+      | assignsubmission_onlinetext_enabled  | 1                           |
+      | submissiondrafts                     | 0                           |
+    And the following "mod_assign > submissions" exist:
+      | assign                | user      | onlinetext                        |
+      | Test assignment name  | student1  | I'm the student first submission  |
+    # Add a group override with a due date set in the future.
+    And I am on the "Test assignment penalty" Activity page logged in as teacher1
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group | Group 1            |
+      | Due date       | ##tomorrow +1day## |
+    And I press "Save"
+    And I change window size to "large"
+    And I go to "Sam1 Student1" "Test assignment penalty" activity advanced grading page
+    And I set the field "Grade out of 100" to "90"
+    And I set the field "Notify student" to "0"
+    And I press "Save changes"
+    And I follow "View all submissions"
+    And "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "90.00"
+    # Modify the group override by changing the due date to a past date.
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I click on "Edit" "link" in the "Group 1" "table_row"
+    When I set the following fields to these values:
+      | Recalculate penalty | Yes                |
+      | Due date            | ##yesterday##      |
+    And I press "Save"
+    And I navigate to "Submissions" in current page administration
+    Then "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "80.00"
+    # Delete the group override.
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I click on "Delete" "link" in the "Group 1" "table_row"
+    And I click on "Recalculate penalty for user(s) in the override" "checkbox" in the "Confirm" "dialogue"
+    And I click on "Continue" "button" in the "Confirm" "dialogue"
+    And I navigate to "Submissions" in current page administration
+    And "Sam1 Student1" row "Grade" column of "submissions" table should contain "90.00"
+    And "Sam1 Student1" row "Final grade" column of "submissions" table should contain "90.00"
+
+  @javascript
+  Scenario: Assign activity group overrides are displayed on the timeline block
+    Given the following "group members" exist:
+      | user     | group |
+      | student1 | G2    |
+    And I am on the "Test assignment name" "assign activity editing" page logged in as teacher1
+    And I set the following fields to these values:
+      | allowsubmissionsfromdate[enabled]  | 1            |
+      | duedate[enabled]                   | 1            |
+      | allowsubmissionsfromdate           | ##today##    |
+      | duedate                            | ##tomorrow## |
+    And I press "Save and display"
+    When I log in as "student1"
+    Then I should see "##tomorrow##%A, %d %B %Y##" in the "Timeline" "block"
+    And I am on the "Test assignment name" "assign activity" page logged in as teacher1
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group         | Group 1            |
+      | Allow submissions from | ##tomorrow##       |
+      | Due date               | ##tomorrow +1day## |
+    And I press "Save"
+    And I log in as "student1"
+    And I should see "##tomorrow +1day##%A, %d %B %Y##" in the "Timeline" "block"
+    And I am on the "Test assignment name" "assign activity" page logged in as teacher1
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group         | Group 2             |
+      | Allow submissions from | ##tomorrow +1day##  |
+      | Due date               | ##tomorrow +3days## |
+    And I press "Save"
+    And I click on "Move up" "link" in the "Group 2" "table_row"
+    And I log in as "student1"
+    And I should see "##tomorrow +3days##%A, %d %B %Y##" in the "Timeline" "block"
+
+  @javascript
+  Scenario: Assign activity user override is displayed even if group override exists on the timeline block
+    Given the following "group members" exist:
+      | user     | group |
+      | student1 | G2    |
+    And I am on the "Test assignment name" "assign activity editing" page logged in as teacher1
+    And I set the following fields to these values:
+      | allowsubmissionsfromdate[enabled]  | 1            |
+      | duedate[enabled]                   | 1            |
+      | allowsubmissionsfromdate           | ##today##    |
+      | duedate                            | ##tomorrow## |
+    And I press "Save and display"
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group         | Group 1            |
+      | Allow submissions from | ##tomorrow##       |
+      | Due date               | ##tomorrow +1day## |
+    And I press "Save"
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group         | Group 2             |
+      | Allow submissions from | ##tomorrow +1day##  |
+      | Due date               | ##tomorrow +3days## |
+    And I navigate to "Overrides > Add user override" in current page administration
+    And I set the following fields to these values:
+      | Override user            | Sam1 Student1     |
+      | allowsubmissionsfromdate | ##tomorrow##      |
+      | duedate                  | ##tomorrow noon## |
+    And I press "Save"
+    When I log in as "student1"
+    Then I should see "##tomorrow noon##%A, %d %B %Y##" in the "Timeline" "block"
+
+  @javascript
+  Scenario: Assign activity override are not visible on timeline block when student is unenrolled
+    Given the following "group members" exist:
+      | user     | group |
+      | student1 | G2    |
+    And I am on the "Test assignment name" "assign activity" page logged in as teacher1
+    And I navigate to "Overrides" in current page administration
+    And I select "Group overrides" from the "jump" singleselect
+    And I press "Add group override"
+    And I set the following fields to these values:
+      | Override group         | Group 2             |
+      | Allow submissions from | ##tomorrow +1day##  |
+      | Due date               | ##tomorrow +3days## |
+    And I navigate to "Overrides > Add user override" in current page administration
+    And I set the following fields to these values:
+      | Override user            | Sam1 Student1     |
+      | allowsubmissionsfromdate | ##tomorrow##      |
+      | duedate                  | ##tomorrow noon## |
+    And I press "Save"
+    And I am on "Course 1" course homepage
+    And I navigate to course participants
+    And I click on "Unenrol" "icon" in the "student1" "table_row"
+    And I click on "Unenrol" "button" in the "Unenrol" "dialogue"
+    When I log in as "student1"
+    Then "Test assignment name" "link" should not exist in the "Timeline" "block"
+    And I should not see "##tomorrow noon##%A, %d %B %Y##" in the "Timeline" "block"

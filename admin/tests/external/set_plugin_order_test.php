@@ -86,47 +86,67 @@ final class set_plugin_order_test extends \externallib_advanced_testcase {
         return [
             [
                 'initialstate' => 'textarea,tiny',
-                'pluginname' => 'editor_textarea',
+                'plugin' => 'editor_textarea',
                 'direction' => 1, // DOWN.
-                'expected' => $getorder([
+                'neworder' => $getorder([
                     'tiny',
                     'textarea',
                 ]),
-                'newtexteditors' => 'tiny,textarea',
+                'newstate' => 'tiny,textarea',
             ],
             [
                 'initialstate' => 'textarea,tiny',
-                'pluginname' => 'editor_textarea',
+                'plugin' => 'editor_textarea',
                 'direction' => -1, // UP.
-                'expected' => $getorder([
+                'neworder' => $getorder([
                     'textarea',
                     'tiny',
                 ]),
-                'newtexteditors' => 'textarea,tiny',
+                'newstate' => 'textarea,tiny',
             ],
             [
                 'initialstate' => 'textarea,tiny',
-                'pluginname' => 'editor_tiny',
+                'plugin' => 'editor_tiny',
                 'direction' => 1, // DOWN.
                 // Tiny is already at the bottom of the list of enabled plugins.
-                'expected' => $getorder([
+                'neworder' => $getorder([
                     'textarea',
                     'tiny',
                 ]),
-                'newtexteditors' => 'textarea,tiny',
+                'newstate' => 'textarea,tiny',
             ],
             [
                 'initialstate' => 'textarea,tiny',
-                'pluginname' => 'editor_atto',
+                'plugin' => 'editor_atto',
                 'direction' => 1, // DOWN.
                 // Atto is not enabled. Disabled editors are listed lexically after enabled editors.
-                'expected' => $getorder([
+                'neworder' => $getorder([
                     'textarea',
                     'tiny',
                 ]),
-                'newtexteditors' => 'textarea,tiny',
+                'newstate' => 'textarea,tiny',
             ],
         ];
+    }
+
+    /**
+     * Test re-ordering plugins where one plugin is not enabled.
+     *
+     *  Media plugins are ordered by rank, with enabled plugins first.
+     * This is similar to the editors test but covers a scenario that cannot be covered by the editors test due to
+     * not having enough plugins.
+     */
+    public function test_execute_media_including_disabled(): void {
+        global $CFG;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $CFG->media_plugins_sortorder = 'videojs,vimeo,html5video';
+
+        set_plugin_order::execute('youtube', -1);
+
+        $this->assertSame('videojs,vimeo,html5video', $CFG->media_plugins_sortorder);
     }
 
     /**

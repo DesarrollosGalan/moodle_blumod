@@ -51,7 +51,9 @@ class content_item_readonly_repository implements content_item_readonly_reposito
         if ($sm->string_exists('modulename_help', $modname)) {
             $help = get_string('modulename_help', $modname);
             if ($sm->string_exists('modulename_link', $modname)) { // Link to further info in Moodle docs.
-                $link = get_string('modulename_link', $modname);
+                // The link is stored in a language file but should not be translated, use value for English.
+                $link = $sm->get_string('modulename_link', $modname, null, 'en');
+                // The text 'More help' and other strings should be in the current language.
                 $linktext = get_string('morehelp');
                 $arialabel = get_string('morehelpaboutmodule', '', get_string('modulename', $modname));
                 $doclink = $OUTPUT->doc_link($link, $linktext, true, ['aria-label' => $arialabel]);
@@ -106,6 +108,19 @@ class content_item_readonly_repository implements content_item_readonly_reposito
             }
         }
         return $contentitems;
+    }
+
+    /**
+     * Filter out any modules that are not to be rendered or managed on the course page.
+     *
+     * @param content_item[] $contentitems items to be filtered
+     * @return content_item[] filtered items
+     */
+    private static function filter_out_items_not_to_be_displayed(array $contentitems): array {
+        return array_filter($contentitems, static function ($module) {
+            [, $name] = core_component::normalize_component($module->get_component_name());
+            return \course_modinfo::is_mod_type_visible_on_course($name);
+        });
     }
 
     /**
@@ -167,7 +182,9 @@ class content_item_readonly_repository implements content_item_readonly_reposito
                 $return[] = $contentitem;
             }
         }
-        return $return;
+
+        // These module types are not to be rendered to the course page.
+        return self::filter_out_items_not_to_be_displayed($return);
     }
 
     /**
@@ -241,6 +258,7 @@ class content_item_readonly_repository implements content_item_readonly_reposito
             }
         }
 
-        return $return;
+        // These module types are not to be rendered to the course page.
+        return self::filter_out_items_not_to_be_displayed($return);
     }
 }

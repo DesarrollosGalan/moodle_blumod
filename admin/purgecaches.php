@@ -23,6 +23,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+define('IGNORE_COMPONENT_CACHE', true);
+
 require_once('../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 
@@ -42,7 +44,11 @@ if ($data = $form->get_data()) {
         purge_caches();
         $message = get_string('purgecachesfinished', 'admin');
     } else {
-        purge_caches($data->purgeselectedoptions);
+        // When passing selected options, ensure each is cast to boolean for strict comparison.
+        purge_caches(array_map(
+            fn($option) => (bool) $option,
+            $data->purgeselectedoptions,
+        ));
         $message = get_string('purgeselectedcachesfinished', 'admin');
     }
 

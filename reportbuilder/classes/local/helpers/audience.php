@@ -209,31 +209,50 @@ class audience {
     }
 
     /**
-     * Return appropriate list of where clauses and params for given audiences
+     * Return appropriate select clause and params for given audience
+     *
+     * @param audience_model $audience
+     * @param string $userfieldsql
+     * @return array [$select, $params]
+     */
+    public static function user_audience_single_sql(audience_model $audience, string $userfieldsql): array {
+        $select = '';
+        $params = [];
+
+        if ($instance = base::instance(0, $audience->to_record())) {
+            $innerusertablealias = database::generate_alias();
+            [$join, $where, $params] = $instance->get_sql($innerusertablealias);
+
+            $select = "{$userfieldsql} IN (
+                SELECT {$innerusertablealias}.id
+                  FROM {user} {$innerusertablealias}
+                       {$join}
+                 WHERE {$where}
+            )";
+        }
+
+        return [$select, $params];
+    }
+
+    /**
+     * Return appropriate list of select clauses and params for given audiences
      *
      * @param audience_model[] $audiences
      * @param string $usertablealias
-     * @return array[] [$wheres, $params]
+     * @return array[] [$selects, $params]
      */
     public static function user_audience_sql(array $audiences, string $usertablealias = 'u'): array {
-        $wheres = $params = [];
+        $selects = $params = [];
 
         foreach ($audiences as $audience) {
-            if ($instance = base::instance(0, $audience->to_record())) {
-                $instancetablealias = database::generate_alias();
-                [$instancejoin, $instancewhere, $instanceparams] = $instance->get_sql($instancetablealias);
-
-                $wheres[] = "{$usertablealias}.id IN (
-                    SELECT {$instancetablealias}.id
-                      FROM {user} {$instancetablealias}
-                           {$instancejoin}
-                     WHERE {$instancewhere}
-                     )";
+            [$instanceselect, $instanceparams] = self::user_audience_single_sql($audience, "{$usertablealias}.id");
+            if ($instanceselect !== '') {
+                $selects[] = $instanceselect;
                 $params += $instanceparams;
             }
         }
 
-        return [$wheres, $params];
+        return [$selects, $params];
     }
 
     /**
@@ -284,6 +303,6 @@ class audience {
      */
     #[\core\attribute\deprecated('custom_report_audience_cards_exporter', since: '4.1', final: true)]
     public static function get_all_audiences_menu_types() {
-        \core\deprecation::emit_deprecation_if_present([self::class, __FUNCTION__]);
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 }

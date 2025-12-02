@@ -48,7 +48,7 @@ class activitychooserbutton implements templatable, renderable {
         protected section_info $section,
         /** @var cm_info|null the course module instance */
         protected ?cm_info $mod = null,
-        /** @var sectionreturn|null the section to return to */
+        /** @var int|null the section to return to */
         protected ?int $sectionreturn = null,
         /** @var array|null action_link[] the action links */
         protected ?array $actionlinks = [],
@@ -72,7 +72,10 @@ class activitychooserbutton implements templatable, renderable {
         );
 
         return (object)[
-            'sectionnum' => $this->section->section,
+            // We keep the old sectionnum properties for backwards compatibility.
+            'sectionnum' => $this->section->sectionnum,
+            'sectionid' => $this->section->id,
+            'sectionname' => get_section_name($this->section->course, $this->section),
             'sectionreturn' => $this->sectionreturn ?? false,
             'modid' => $this->mod ? $this->mod->id : false,
             'activityname' => $this->mod ? $this->mod->get_formatted_name() : false,

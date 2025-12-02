@@ -1796,9 +1796,6 @@ final class modinfolib_test extends advanced_testcase {
     public function test_get_sections_delegated_by_cm(): void {
         $this->resetAfterTest();
 
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
-
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
 
         $modinfo = get_fast_modinfo($course);
@@ -1827,9 +1824,6 @@ final class modinfolib_test extends advanced_testcase {
      */
     public function test_get_delegated_section_info(): void {
         $this->resetAfterTest();
-
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
 
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
 
@@ -1866,9 +1860,6 @@ final class modinfolib_test extends advanced_testcase {
         bool $expected,
     ): void {
         $this->resetAfterTest();
-
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
 
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
         $subsection = $this->getDataGenerator()->create_module('subsection', ['course' => $course], ['section' => 1]);
@@ -1971,9 +1962,6 @@ final class modinfolib_test extends advanced_testcase {
     ): void {
         $this->resetAfterTest();
 
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
-
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
         $subsection = $this->getDataGenerator()->create_module('subsection', ['course' => $course], ['section' => 1]);
 
@@ -1983,6 +1971,7 @@ final class modinfolib_test extends advanced_testcase {
         $user = $this->getDataGenerator()->create_and_enrol($course, $role);
 
         if (!$enabled) {
+            $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
             $manager::enable_plugin('subsection', 0);
             rebuild_course_cache($course->id, true);
         }
@@ -2062,9 +2051,6 @@ final class modinfolib_test extends advanced_testcase {
                 ],
             ]
         );
-
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
 
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
 
@@ -2173,12 +2159,8 @@ final class modinfolib_test extends advanced_testcase {
      * @return void
      */
     public function test_is_orphan(): void {
-        global $DB;
 
         $this->resetAfterTest();
-
-        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
-        $manager::enable_plugin('subsection', 1);
 
         $course = $this->getDataGenerator()->create_course(['numsections' => 1]);
         $subsection = $this->getDataGenerator()->create_module('subsection', ['course' => $course], ['section' => 1]);
@@ -2191,6 +2173,7 @@ final class modinfolib_test extends advanced_testcase {
         $this->assertFalse($delegatedsection->is_orphan());
 
         // Delegated sections without a component instance (disabled mod_subsection) is considered orphan.
+        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
         $manager::enable_plugin('subsection', 0);
         rebuild_course_cache($course->id, true);
 
@@ -2256,5 +2239,117 @@ final class modinfolib_test extends advanced_testcase {
         $sectioninfo = $modinfo->get_section_info(2);
         $cms = $sectioninfo->get_sequence_cm_infos();
         $this->assertCount(0, $cms);
+    }
+
+    /**
+     * Test for cm_info::get_instance_record
+     *
+     * @covers \cm_info::get_instance_record
+     * @return void
+     */
+    public function test_section_get_instance_record(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course(['numsections' => 2]);
+        $activity = $this->getDataGenerator()->create_module('page', ['course' => $course], ['section' => 0]);
+
+        $modinfo = get_fast_modinfo($course->id);
+        $cminfo = $modinfo->get_cm($activity->cmid);
+
+        $instancerecord = $DB->get_record('page', ['id' => $activity->id]);
+
+        $instance = $cminfo->get_instance_record();
+        $this->assertEquals($instancerecord, $instance);
+
+        // The instance record should be cached.
+        $DB->delete_records('page', ['id' => $activity->id]);
+
+        $instance2 = $cminfo->get_instance_record();
+        $this->assertEquals($instancerecord, $instance);
+        $this->assertEquals($instance, $instance2);
+    }
+
+    /**
+     * Test for sort_cm_array method.
+     */
+    public function test_sort_cm_array(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        // Create a course with 4 sections.
+        $course = $generator->create_course(['numsections' => 3]);
+        $generator->create_module('page', ['name' => 'Page s1', 'course' => $course->id, 'section' => 0]);
+        $generator->create_module('page', ['name' => 'Page s2', 'course' => $course->id, 'section' => 1]);
+        $generator->create_module('assign', ['name' => 'Assign s3', 'course' => $course->id, 'section' => 2]);
+        $generator->create_module('page', ['name' => 'Page s3', 'course' => $course->id, 'section' => 3]);
+        // Check we return all cms in order.
+        $cms = get_fast_modinfo($course)->get_instances_of('page');
+        get_fast_modinfo($course)->sort_cm_array($cms);
+        $this->assertCount(3, $cms);
+        $this->assertEquals(['Page s1', 'Page s2', 'Page s3'], array_column($cms, 'name'));
+
+        // Generate some delegated sections (not listed).
+        $module = $this->getDataGenerator()->create_module('subsection', (object) ['course' => $course->id, 'section' => 1]);
+        $sub1 = get_fast_modinfo($course)->get_section_info_by_component('mod_subsection', $module->id);
+        $generator->create_module('page', ['name' => 'Page sub1', 'course' => $course->id, 'section' => $sub1->sectionnum]);
+        $generator->create_module('page', ['name' => 'Page sub2', 'course' => $course->id, 'section' => $sub1->sectionnum]);
+        $generator->create_module('assign', ['name' => 'Assign sub1', 'course' => $course->id, 'section' => $sub1->sectionnum]);
+
+        $cms = get_fast_modinfo($course)->get_instances_of('page');
+        get_fast_modinfo($course)->sort_cm_array($cms);
+        $this->assertCount(5, $cms);
+        $this->assertEquals(['Page s1', 'Page s2', 'Page sub1', 'Page sub2', 'Page s3'], array_column($cms, 'name'));
+
+        $cms = get_fast_modinfo($course)->get_instances_of('assign');
+        get_fast_modinfo($course)->sort_cm_array($cms);
+        $this->assertCount(2, $cms);
+        $this->assertEquals(['Assign sub1', 'Assign s3'], array_column($cms, 'name'));
+    }
+
+    /**
+     * Test for get_instance_of method.
+     */
+    public function test_get_instance_of(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        // Create a course with 4 sections.
+        $course = $generator->create_course(['numsections' => 3]);
+        $generator->create_module('page', ['name' => 'Page s1', 'course' => $course->id, 'section' => 0]);
+        $generator->create_module('page', ['name' => 'Page s2', 'course' => $course->id, 'section' => 1]);
+        $generator->create_module('assign', ['name' => 'Assign s3', 'course' => $course->id, 'section' => 2]);
+
+        $modinfo = get_fast_modinfo($course);
+        $pagecms = array_values($modinfo->get_instances_of('page'));
+        $assigncms = array_values($modinfo->get_instances_of('assign'));
+        $this->assertCount(2, $pagecms);
+        $this->assertCount(1, $assigncms);
+
+        $this->assertEquals('Page s1', $modinfo->get_instance_of('page', $pagecms[0]->instance)->name);
+        $this->assertEquals('Page s2', $modinfo->get_instance_of('page', $pagecms[1]->instance)->name);
+        $this->assertEquals('Assign s3', $modinfo->get_instance_of('assign', $assigncms[0]->instance)->name);
+
+        $this->assertNull($modinfo->get_instance_of('page', 99999));
+        $this->assertNull($modinfo->get_instance_of('assign', 99999));
+        $this->assertNull($modinfo->get_instance_of('nonexisting', 99999));
+    }
+
+    /**
+     * Test for get_instance_of method when asking for a non existing module with MUST_EXIST.
+     */
+    public function test_get_instance_of_exception(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        // Create a course with 4 sections.
+        $course = $generator->create_course(['numsections' => 3]);
+        $generator->create_module('page', ['name' => 'Page s1', 'course' => $course->id, 'section' => 0]);
+        $generator->create_module('page', ['name' => 'Page s2', 'course' => $course->id, 'section' => 1]);
+        $generator->create_module('assign', ['name' => 'Assign s3', 'course' => $course->id, 'section' => 2]);
+
+        $modinfo = get_fast_modinfo($course);
+
+        $this->expectException(moodle_exception::class);
+        $this->expectExceptionMessage('Invalid module ID: 99999');
+        $modinfo->get_instance_of('page', 99999, MUST_EXIST);
     }
 }

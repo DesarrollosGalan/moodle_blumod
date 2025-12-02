@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Language strings.
+ * Strings for component 'factor_totp', language 'en'.
  *
  * @package     factor_totp
  * @subpackage  tool_mfa
@@ -51,6 +51,8 @@ $string['privacy:metadata'] = 'The Authenticator app factor plugin does not stor
 $string['replacefactor'] = 'Replace authenticator app';
 $string['replacefactorconfirmation'] = 'Replace \'{$a}\' authenticator app?';
 $string['revokefactorconfirmation'] = 'Remove \'{$a}\' authenticator app?';
+$string['settings:description'] = 'Users will need an authenticator app installed on their mobile devices to generate a code, which they must enter during login.';
+$string['settings:shortdescription'] = 'Require users to enter a code from an authenticator app on their devices during login.';
 $string['settings:totplink'] = 'Show mobile app setup link';
 $string['settings:totplink_help'] = 'If enabled the user will see a 3rd setup option with a direct otpauth:// link';
 $string['settings:window'] = 'TOTP verification window';
@@ -71,7 +73,7 @@ $string['setupfactor:instructionsverification'] = '3. Enter the verification cod
 $string['setupfactor:intro'] = 'To set up this method, you need to have a device with an authenticator app. If you don\'t have an app, you can download one. For example, <a href="https://2fas.com/" target="_blank">2FAS Auth</a>, <a href="https://freeotp.github.io/" target="_blank">FreeOTP</a>, Google Authenticator, Microsoft Authenticator or Twilio Authy.';
 $string['setupfactor:key'] = 'Secret key: ';
 $string['setupfactor:link'] = 'Or enter details manually.';
-$string['setupfactor:link_help'] = 'If you are on a mobile device and already have an authenticator app installed this link may work. Note that using TOTP on the same device as you login on can weaken the benefits of MFA.';
+$string['setupfactor:link_help'] = 'If you are on a mobile device and already have an authenticator app installed this link may work. Note that using TOTP on the same device as you log in on can weaken the benefits of MFA.';
 $string['setupfactor:linklabel'] = 'Open app already installed on this device';
 $string['setupfactor:mode'] = 'Mode:';
 $string['setupfactor:mode:timebased'] = 'Time-based';
@@ -81,7 +83,3 @@ $string['summarycondition'] = 'using a TOTP app';
 $string['systimeformat'] = '%l:%M:%S %P %Z';
 $string['verificationcode'] = 'Enter your 6 digit verification code';
 $string['verificationcode_help'] = 'Open your authenticator app such as Google Authenticator and look for the 6 digit code which matches this site and username';
-
-// Deprecated since Moodle 4.4.
-$string['setupfactor:scanfail'] = 'Can\'t scan?';
-$string['setupfactor:scan'] = 'Scan QR code';

@@ -279,6 +279,12 @@ final class users_test extends core_reportbuilder_testcase {
                 'user:fullname_operator' => text::CONTAINS,
                 'user:fullname_value' => 'Alfie',
             ], false],
+            'Filter picture' => ['user:picture', [
+                'user:picture_operator' => boolean_select::NOT_CHECKED,
+            ], true],
+            'Filter picture (no match)' => ['user:picture', [
+                'user:picture_operator' => boolean_select::CHECKED,
+            ], false],
             'Filter firstname' => ['user:firstname', [
                 'user:firstname_operator' => text::IS_EQUAL_TO,
                 'user:firstname_value' => 'Zoe',
@@ -380,8 +386,8 @@ final class users_test extends core_reportbuilder_testcase {
                 'user:lang_value' => 'en',
             ], true],
             'Filter lang (no match)' => ['user:lang', [
-                'user:lang_operator' => select::EQUAL_TO,
-                'user:lang_value' => 'de',
+                'user:lang_operator' => select::NOT_EQUAL_TO,
+                'user:lang_value' => 'en',
             ], false],
             'Filter timezone' => ['user:timezone', [
                 'user:timezone_operator' => select::EQUAL_TO,

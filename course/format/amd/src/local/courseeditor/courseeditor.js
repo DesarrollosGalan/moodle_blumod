@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+import Config from 'core/config';
 import {getString} from 'core/str';
 import {Reactive} from 'core/reactive';
 import notification from 'core/notification';
@@ -49,12 +50,20 @@ export default class extends Reactive {
     stateKey = 1;
 
     /**
-     * The current page section return
+     * The section number of the current page
      * @attribute sectionReturn
      * @type number
      * @default null
      */
     sectionReturn = null;
+
+    /**
+     * The section ID of the current page
+     * @attribute pageSectionId
+     * @type number
+     * @default null
+     */
+    pageSectionId = null;
 
     /**
      * Set up the course editor when the page is ready.
@@ -218,6 +227,16 @@ export default class extends Reactive {
      * @returns {Object} the current course state
      */
     async getServerCourseState() {
+        // Only logged users can get the course state. Filtering here will prevent unnecessary
+        // calls to the server and login page redirects. Especially for home activities with
+        // guest access.
+        if (Config.userId == 0) {
+            return {
+                course: {},
+                section: [],
+                cm: [],
+            };
+        }
         const courseState = await ajax.call([{
             methodname: 'core_courseformat_get_state',
             args: {

@@ -53,15 +53,15 @@ class core_message_renderer extends plugin_renderer_base {
         $output .= $this->heading(get_string('messageoutputs', 'message'));
         $output .= $this->manage_messageoutputs($allprocessors);
 
-        // Add active message output processors settings.
-        $output .= $this->manage_defaultmessageoutputs($processors, $providers, $preferences);
-
-        $output .= html_writer::start_tag('div', array('class' => 'form-buttons'));
+        $output .= html_writer::start_tag('div', ['class' => 'form-buttons mb-3']);
         $output .= html_writer::empty_tag('input',
             array('type' => 'submit', 'value' => get_string('savechanges', 'admin'), 'class' => 'form-submit btn btn-primary')
         );
         $output .= html_writer::end_tag('div');
         $output .= html_writer::end_tag('form');
+
+        // Add active message output processors settings.
+        $output .= $this->manage_defaultmessageoutputs($processors, $providers, $preferences);
 
         return $output;
     }
@@ -75,7 +75,9 @@ class core_message_renderer extends plugin_renderer_base {
     public function manage_messageoutputs($processors) {
         // Display the current workflows
         $table = new html_table();
-        $table->attributes['class'] = 'admintable generaltable';
+        $table->caption = get_string('messageoutputs', 'message');
+        $table->captionhide = true;
+        $table->attributes['class'] = 'admintable generaltable table table-hover';
         $table->data        = array();
         $table->head        = array(
             get_string('name'),
@@ -90,7 +92,11 @@ class core_message_renderer extends plugin_renderer_base {
             $row = new html_table_row();
             $row->attributes['class'] = 'messageoutputs';
 
-            $name = new html_table_cell(get_string('pluginname', 'message_'.$processor->name));
+            $pluginname = get_string('pluginname', 'message_' . $processor->name);
+            $name = new html_table_cell($pluginname);
+            $name->header = true;
+            $name->attributes['class'] = 'fw-normal';
+            $name->attributes['scope'] = 'row';
             $enable = new html_table_cell();
             if (!$processor->available) {
                 $enable->text = html_writer::nonempty_tag('span', get_string('outputnotavailable', 'message'),
@@ -98,7 +104,10 @@ class core_message_renderer extends plugin_renderer_base {
                 );
             } else {
                 $enable->text = html_writer::checkbox($processor->name, $processor->id, $processor->enabled, '',
-                    array('id' => $processor->name)
+                    [
+                        'id' => $processor->name,
+                        'aria-label' => get_string('enablenotificationplugin', 'message', $pluginname),
+                    ]
                 );
             }
             // Settings
@@ -143,6 +152,12 @@ class core_message_renderer extends plugin_renderer_base {
             // Settings for each processor
             foreach ($processors as $processor) {
                 $setting = new StdClass();
+
+                $supportsprocessor = true;
+                if ($processor->name === 'sms') {
+                    $supportsprocessor = core_message\helper::supports_sms_notifications($provider);
+                }
+                $setting->supportsprocessor = $supportsprocessor;
 
                 $setting->lockedsetting = $providersettingprefix.'locked['.$processor->name.']';
                 $preference = $processor->name.'_provider_'.$providersettingprefix.'locked';

@@ -106,7 +106,7 @@ class user_picture implements renderable {
             if (!property_exists($user, $field)) {
                 $needrec = true;
                 debugging(
-                    "Missing {$field} property in {$user} object, "
+                    "Missing '{$field}' property in \$user object, "
                         . "this is a performance problem that needs to be fixed by a developer. "
                         . 'Please use the \core_user\fields API to get the full list of required fields.',
                     DEBUG_DEVELOPER,
@@ -136,7 +136,7 @@ class user_picture implements renderable {
      *
      * @param string $tableprefix name of database table prefix in query
      * @param null|array $extrafields extra fields to be included in result
-     *      Do not include TEXT columns because it would break SELECT DISTINCT in MSSQL and ORACLE.
+     *      Do not include TEXT columns because it would break SELECT DISTINCT in MSSQL.
      * @param string $idalias alias of id field
      * @param string $fieldprefix prefix to add to all columns in their aliases, does not apply to 'id'
      * @return string

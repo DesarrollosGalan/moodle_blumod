@@ -1222,6 +1222,17 @@ class grade_item extends grade_object {
         return ($this->is_category_item() || $this->is_course_item());
     }
 
+
+    /**
+     * Returns whether the item is gradable or not. It's considered gradable when there is at least one gradeitem
+     * set as GRADE_TYPE_VALUE or GRADE_TYPE_SCALE.
+     *
+     * @return bool
+     */
+    public function is_gradable(): bool {
+        return $this->gradetype == GRADE_TYPE_VALUE || $this->gradetype == GRADE_TYPE_SCALE;
+    }
+
     /**
      * Returns the grade item associated with the course
      *
@@ -1717,7 +1728,7 @@ class grade_item extends grade_object {
             $params = array();
 
             //only items with numeric or scale values can be aggregated
-            if ($this->gradetype != GRADE_TYPE_VALUE and $this->gradetype != GRADE_TYPE_SCALE) {
+            if (!$this->is_gradable()) {
                 $this->dependson_cache = array();
                 return $this->dependson_cache;
             }
@@ -2086,6 +2097,11 @@ class grade_item extends grade_object {
         }
         // end of hack alert
 
+        // Only reset the deducted mark if the grade has changed.
+        if ($grade->timemodified !== $oldgrade->timemodified) {
+            $grade->deductedmark = 0;
+        }
+
         $gradechanged = false;
         if (empty($grade->id)) {
             $result = (bool)$grade->insert($source, $isbulkupdate);
@@ -2144,6 +2160,21 @@ class grade_item extends grade_object {
         }
 
         return $result;
+    }
+
+    /**
+     * Update penalty value for given user
+     *
+     * @param int $userid The graded user
+     * @param float $deductedmark The mark deducted from final grade
+     */
+    public function update_deducted_mark(int $userid, float $deductedmark): void {
+        $grade = new grade_grade([
+                'itemid' => $this->id,
+                'userid' => $userid,
+            ]);
+        $grade->deductedmark = $deductedmark;
+        $grade->update();
     }
 
     /**

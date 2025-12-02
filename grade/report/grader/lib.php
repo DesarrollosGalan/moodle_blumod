@@ -25,6 +25,8 @@
 require_once($CFG->dirroot . '/grade/report/lib.php');
 require_once($CFG->libdir.'/tablelib.php');
 
+use core_grades\penalty_manager;
+
 /**
  * Class providing an API for the grader report building and displaying.
  * @uses grade_report
@@ -549,13 +551,19 @@ class grade_report_grader extends grade_report {
     public function get_max_students_per_page(): int {
         global $CFG;
 
+        $gradeitemcount = count($this->get_allgradeitems());
+
         if (isset($CFG->maxgradesperpage) && clean_param($CFG->maxgradesperpage, PARAM_INT) > 0) {
             $maxgradesperpage = $CFG->maxgradesperpage;
         } else {
             $maxgradesperpage = self::MAX_GRADES_PER_PAGE;
         }
 
-        return round($maxgradesperpage / count($this->get_allgradeitems()));
+        if ($gradeitemcount > 0) {
+            return round($maxgradesperpage / $gradeitemcount);
+        } else {
+            return $maxgradesperpage;
+        }
     }
 
     /**
@@ -626,23 +634,6 @@ class grade_report_grader extends grade_report {
     }
 
     /**
-     * Gets html toggle
-     * @deprecated since Moodle 2.4 as it appears not to be used any more.
-     */
-    public function get_toggles_html() {
-        throw new coding_exception('get_toggles_html() can not be used any more');
-    }
-
-    /**
-     * Prints html toggle
-     * @deprecated since 2.4 as it appears not to be used any more.
-     * @param unknown $type
-     */
-    public function print_toggle($type) {
-        throw new coding_exception('print_toggle() can not be used any more');
-    }
-
-    /**
      * Builds and returns the rows that will make up the left part of the grader report
      * This consists of student names and icons, links to user reports and id numbers, as well
      * as header cells for these columns. It also includes the fillers required for the
@@ -677,7 +668,9 @@ class grade_report_grader extends grade_report {
         $fillercell->colspan = $colspan;
         $fillercell->rowspan = $levels;
         $row = new html_table_row(array($fillercell));
-        $rows[] = $row;
+        if ($levels >= 1) { // Do not display the filler cell if there are no levels as there will be nothing else in the row.
+            $rows[] = $row;
+        }
 
         for ($i = 1; $i < $levels; $i++) {
             $row = new html_table_row();
@@ -698,7 +691,6 @@ class grade_report_grader extends grade_report {
         $element = ['type' => 'userfield', 'name' => 'fullname'];
         $studentheader->text = $arrows['studentname'] .
             $this->gtree->get_cell_action_menu($element, 'gradeitem', $this->gpr, $this->baseurl);
-
         $headerrow->cells[] = $studentheader;
 
         foreach ($extrafields as $field) {
@@ -1200,6 +1192,7 @@ class grade_report_grader extends grade_report {
                         $context->extraclasses = 'gradevalue ' . $hidden . $gradepass;
                         $context->text = grade_format_gradevalue($gradeval, $item, true,
                             $gradedisplaytype, null);
+                        $context->text .= penalty_manager::show_penalty_indicator($grade);
                     }
                 }
 
@@ -1313,10 +1306,15 @@ class grade_report_grader extends grade_report {
 
         // Extract rows from each side (left and right) and collate them into one row each
         foreach ($leftrows as $key => $row) {
-            $row->cells = array_merge($row->cells, $rightrows[$key]->cells);
-            $fulltable->data[] = $row;
-            unset($leftrows[$key]);
-            unset($rightrows[$key]);
+            if (isset($rightrows[$key])) {
+                $row->cells = array_merge($row->cells, $rightrows[$key]->cells);
+                $fulltable->data[] = $row;
+                unset($leftrows[$key]);
+                unset($rightrows[$key]);
+            } else { // Right row is not set - this is the case of the left side.
+                $fulltable->data[] = $row;
+                unset($leftrows[$key]);
+            }
         }
         $html .= html_writer::table($fulltable);
         return $OUTPUT->container($html, 'gradeparent');
@@ -1498,180 +1496,10 @@ class grade_report_grader extends grade_report {
 
     /**
      * @deprecated since Moodle 4.4 - Call calculate_average instead.
-     * Builds and return the row of averages for the right part of the grader report.
-     * @param array $rows Whether to return only group averages or all averages.
-     * @param bool $grouponly Whether to return only group averages or all averages.
-     * @return array Array of rows for the right part of the report
      */
-    public function get_right_avg_row($rows=array(), $grouponly=false) {
-        global $USER, $DB, $OUTPUT, $CFG;
-
-        debugging('grader_report_grader::get_right_avg_row() is deprecated.
-            Call grade_report::calculate_average() instead.', DEBUG_DEVELOPER);
-
-        if (!$this->canviewhidden) {
-            // Totals might be affected by hiding, if user can not see hidden grades the aggregations might be altered
-            // better not show them at all if user can not see all hidden grades.
-            return $rows;
-        }
-
-        $averagesdisplaytype   = $this->get_pref('averagesdisplaytype');
-        $averagesdecimalpoints = $this->get_pref('averagesdecimalpoints');
-        $meanselection         = $this->get_pref('meanselection');
-        $shownumberofgrades    = $this->get_pref('shownumberofgrades');
-
-        if ($grouponly) {
-            $showaverages = $this->currentgroup && $this->get_pref('showaverages');
-            $groupsql = $this->groupsql;
-            $groupwheresql = $this->groupwheresql;
-            $groupwheresqlparams = $this->groupwheresql_params;
-        } else {
-            $showaverages = $this->get_pref('showaverages');
-            $groupsql = "";
-            $groupwheresql = "";
-            $groupwheresqlparams = array();
-        }
-
-        if ($showaverages) {
-            $totalcount = $this->get_numusers($grouponly);
-
-            // Limit to users with a gradeable role.
-            list($gradebookrolessql, $gradebookrolesparams) = $DB->get_in_or_equal(explode(',', $this->gradebookroles), SQL_PARAMS_NAMED, 'grbr0');
-
-            // Limit to users with an active enrollment.
-            $coursecontext = $this->context->get_course_context(true);
-            $defaultgradeshowactiveenrol = !empty($CFG->grade_report_showonlyactiveenrol);
-            $showonlyactiveenrol = get_user_preferences('grade_report_showonlyactiveenrol', $defaultgradeshowactiveenrol);
-            $showonlyactiveenrol = $showonlyactiveenrol || !has_capability('moodle/course:viewsuspendedusers', $coursecontext);
-            list($enrolledsql, $enrolledparams) = get_enrolled_sql($this->context, '', 0, $showonlyactiveenrol);
-
-            // We want to query both the current context and parent contexts.
-            list($relatedctxsql, $relatedctxparams) = $DB->get_in_or_equal($this->context->get_parent_context_ids(true), SQL_PARAMS_NAMED, 'relatedctx');
-
-            $params = array_merge(array('courseid' => $this->courseid), $gradebookrolesparams, $enrolledparams, $groupwheresqlparams, $relatedctxparams);
-
-            // Find sums of all grade items in course.
-            $sql = "SELECT g.itemid, SUM(g.finalgrade) AS sum
-                      FROM {grade_items} gi
-                      JOIN {grade_grades} g ON g.itemid = gi.id
-                      JOIN {user} u ON u.id = g.userid
-                      JOIN ($enrolledsql) je ON je.id = u.id
-                      JOIN (
-                               SELECT DISTINCT ra.userid
-                                 FROM {role_assignments} ra
-                                WHERE ra.roleid $gradebookrolessql
-                                  AND ra.contextid $relatedctxsql
-                           ) rainner ON rainner.userid = u.id
-                      $groupsql
-                     WHERE gi.courseid = :courseid
-                       AND u.deleted = 0
-                       AND g.finalgrade IS NOT NULL
-                       $groupwheresql
-                     GROUP BY g.itemid";
-            $sumarray = array();
-            if ($sums = $DB->get_records_sql($sql, $params)) {
-                foreach ($sums as $itemid => $csum) {
-                    $sumarray[$itemid] = $csum->sum;
-                }
-            }
-
-            // MDL-10875 Empty grades must be evaluated as grademin, NOT always 0
-            // This query returns a count of ungraded grades (NULL finalgrade OR no matching record in grade_grades table)
-            $sql = "SELECT gi.id, COUNT(DISTINCT u.id) AS count
-                      FROM {grade_items} gi
-                      CROSS JOIN ($enrolledsql) u
-                      JOIN {role_assignments} ra
-                           ON ra.userid = u.id
-                      LEFT OUTER JOIN {grade_grades} g
-                           ON (g.itemid = gi.id AND g.userid = u.id AND g.finalgrade IS NOT NULL)
-                      $groupsql
-                     WHERE gi.courseid = :courseid
-                           AND ra.roleid $gradebookrolessql
-                           AND ra.contextid $relatedctxsql
-                           AND g.id IS NULL
-                           $groupwheresql
-                  GROUP BY gi.id";
-
-            $ungradedcounts = $DB->get_records_sql($sql, $params);
-
-            $avgrow = new html_table_row();
-            $avgrow->attributes['class'] = 'avg';
-
-            foreach ($this->gtree->items as $itemid => $unused) {
-                $item =& $this->gtree->items[$itemid];
-
-                if ($item->needsupdate) {
-                    $avgcell = new html_table_cell();
-                    $avgcell->attributes['class'] = 'i'. $itemid;
-                    $avgcell->text = $OUTPUT->container(get_string('error'), 'gradingerror');
-                    $avgrow->cells[] = $avgcell;
-                    continue;
-                }
-
-                if (!isset($sumarray[$item->id])) {
-                    $sumarray[$item->id] = 0;
-                }
-
-                if (empty($ungradedcounts[$itemid])) {
-                    $ungradedcount = 0;
-                } else {
-                    $ungradedcount = $ungradedcounts[$itemid]->count;
-                }
-
-                if ($meanselection == GRADE_REPORT_MEAN_GRADED) {
-                    $meancount = $totalcount - $ungradedcount;
-                } else { // Bump up the sum by the number of ungraded items * grademin
-                    $sumarray[$item->id] += $ungradedcount * $item->grademin;
-                    $meancount = $totalcount;
-                }
-
-                // Determine which display type to use for this average
-                if (!empty($USER->editing)) {
-                    $displaytype = GRADE_DISPLAY_TYPE_REAL;
-
-                } else if ($averagesdisplaytype == GRADE_REPORT_PREFERENCE_INHERIT) { // no ==0 here, please resave the report and user preferences
-                    $displaytype = $item->get_displaytype();
-
-                } else {
-                    $displaytype = $averagesdisplaytype;
-                }
-
-                // Override grade_item setting if a display preference (not inherit) was set for the averages
-                if ($averagesdecimalpoints == GRADE_REPORT_PREFERENCE_INHERIT) {
-                    $decimalpoints = $item->get_decimals();
-
-                } else {
-                    $decimalpoints = $averagesdecimalpoints;
-                }
-
-                $gradetypeclass = $this->get_cell_display_class($item);
-
-                if (!isset($sumarray[$item->id]) || $meancount == 0) {
-                    $avgcell = new html_table_cell();
-                    $avgcell->attributes['class'] = $gradetypeclass . ' i'. $itemid;
-                    $avgcell->attributes['data-itemid'] = $itemid;
-                    $avgcell->text = html_writer::div('-', '', ['data-collapse' => 'avgrowcell']);
-                    $avgrow->cells[] = $avgcell;
-                } else {
-                    $sum = $sumarray[$item->id];
-                    $avgradeval = $sum/$meancount;
-                    $gradehtml = grade_format_gradevalue($avgradeval, $item, true, $displaytype, $decimalpoints);
-
-                    $numberofgrades = '';
-                    if ($shownumberofgrades) {
-                        $numberofgrades = " ($meancount)";
-                    }
-
-                    $avgcell = new html_table_cell();
-                    $avgcell->attributes['class'] = $gradetypeclass . ' i'. $itemid;
-                    $avgcell->attributes['data-itemid'] = $itemid;
-                    $avgcell->text = html_writer::div($gradehtml.$numberofgrades, '', ['data-collapse' => 'avgrowcell']);
-                    $avgrow->cells[] = $avgcell;
-                }
-            }
-            $rows[] = $avgrow;
-        }
-        return $rows;
+    #[\core\attribute\deprecated('grade_report::calculate_average()', since: '4.4', final: true)]
+    public function get_right_avg_row() {
+        \core\deprecation::emit_deprecation([self::class, __FUNCTION__]);
     }
 
     /**
@@ -1698,7 +1526,7 @@ class grade_report_grader extends grade_report {
             'class' => 'gradeitemheader',
             'aria-describedby' => $describedbyid
         ]);
-        $courseheader .= html_writer::div($showing, 'sr-only', [
+        $courseheader .= html_writer::div($showing, 'visually-hidden', [
             'id' => $describedbyid
         ]);
 
@@ -1758,15 +1586,6 @@ class grade_report_grader extends grade_report {
         }
 
         return $OUTPUT->container($editicon.$editcalculationicon.$showhideicon.$lockunlockicon.$gradeanalysisicon, 'grade_icons');
-    }
-
-    /**
-     * Given a category element returns collapsing +/- icon if available
-     *
-     * @deprecated since Moodle 2.9 MDL-46662 - please do not use this function any more.
-     */
-    protected function get_collapsing_icon($element) {
-        throw new coding_exception('get_collapsing_icon() can not be used any more, please use get_course_header() instead.');
     }
 
     /**

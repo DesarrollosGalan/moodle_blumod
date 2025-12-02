@@ -90,6 +90,7 @@ Feature: Manage notification preferences - Email
     Then the field "message_provider_mod_assign_assign_notification_email" matches value "0"
     And I should not see "Enabled" in the "Assignment notifications" "table_row"
 
+  @accessibility
   Scenario: Lock email notifications for Forum providers
     Given I log in as "admin"
     When I navigate to "Messaging > Notification settings" in site administration
@@ -109,6 +110,7 @@ Feature: Manage notification preferences - Email
     And I click on "Notification preferences" "link" in the "#page-content" "css_element"
     And I should see "Locked on" in the "[data-preference-key=message_provider_mod_forum_posts]" "css_element"
     And I should see "Locked off" in the "[data-preference-key=message_provider_mod_forum_digests]" "css_element"
+    And the page should meet accessibility standards with "best-practice" extra tests
 
   Scenario: User can disable notification preferences
     Given the following "courses" exist:
@@ -143,14 +145,14 @@ Feature: Manage notification preferences - Email
     # Open the popover.
     And I open the notification popover
     # Confirm the submission notification is NOT visible.
-    And I should not see "You have submitted your assignment submission for Test assignment name" in the "#nav-notification-popover-container" "css_element"
+    And I should not see "Assignment submission confirmation" in the "#nav-notification-popover-container" "css_element"
     And I log in as "student2"
     # Confirm the popover is showing the unread notifications.
     Then I should see "1" in the "#nav-notification-popover-container [data-region='count-container']" "css_element"
     # Open the popover.
     And I open the notification popover
     # Confirm the submission notification is visible.
-    And I should see "You have submitted your assignment submission for Test assignment name" in the "#nav-notification-popover-container" "css_element"
+    And I should see "Assignment submission confirmation" in the "#nav-notification-popover-container" "css_element"
 
   Scenario: User cannot disable forced notification preferences
     Given the following "courses" exist:
@@ -182,7 +184,7 @@ Feature: Manage notification preferences - Email
     # Open the popover.
     And I open the notification popover
     # Confirm the submission notification is visible.
-    And I should see "You have submitted your assignment submission for Test assignment name" in the "#nav-notification-popover-container" "css_element"
+    And I should see "Assignment submission confirmation" in the "#nav-notification-popover-container" "css_element"
 
   Scenario: User cannot disable disallowed notification preferences
     Given the following "courses" exist:
@@ -214,7 +216,7 @@ Feature: Manage notification preferences - Email
     # Open the popover.
     And I open the notification popover
     # Confirm the submission notification is NOT visible.
-    And I should not see "You have submitted your assignment submission for Test assignment name" in the "#nav-notification-popover-container" "css_element"
+    And I should not see "Assignment submission confirmation" in the "#nav-notification-popover-container" "css_element"
 
   Scenario: Toggle notification preferences hides/displays options
     Given I log in as "admin"
@@ -223,7 +225,6 @@ Feature: Manage notification preferences - Email
     Then I should see "Subscribed forum posts"
     And I navigate to "Messaging > Notification settings" in site administration
     And I click on "Subscribed forum posts" "checkbox"
-    And I click on "Save changes" "button"
     And I follow "Preferences" in the user menu
     And I click on "Notification preferences" "link" in the "#page-content" "css_element"
     And I should not see "Subscribed forum posts"

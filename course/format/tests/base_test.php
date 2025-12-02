@@ -541,13 +541,14 @@ final class base_test extends advanced_testcase {
         $course = $generator->create_course();
         $format = course_get_format($course);
 
-        $originalsection = $DB->get_record('course_sections', ['course' => $course->id, 'section' => 1], '*', MUST_EXIST);
+        $originalsection = $DB->get_record('course_sections', ['course' => $course->id, 'section' => 0], '*', MUST_EXIST);
         $generator->create_module('page', ['course' => $course, 'section' => $originalsection->section]);
         $generator->create_module('page', ['course' => $course, 'section' => $originalsection->section]);
         $generator->create_module('page', ['course' => $course, 'section' => $originalsection->section]);
+        $generator->create_module('qbank', ['course' => $course, 'section' => $originalsection->section]);
 
         $originalmodcount = $DB->count_records('course_modules', ['course' => $course->id, 'section' => $originalsection->id]);
-        $this->assertEquals(3, $originalmodcount);
+        $this->assertEquals(4, $originalmodcount);
 
         $modinfo = get_fast_modinfo($course);
         $sectioninfo = $modinfo->get_section_info($originalsection->section, MUST_EXIST);
@@ -563,7 +564,49 @@ final class base_test extends advanced_testcase {
         }
 
         $newmodcount = $DB->count_records('course_modules', ['course' => $course->id, 'section' => $newsection->id]);
-        $this->assertEquals($originalmodcount, $newmodcount);
+        $modinfo = course_modinfo::instance($course);
+        $qbankinstances = $modinfo->get_instances_of('qbank');
+        $this->assertCount(1, $qbankinstances);
+        $this->assertEquals($originalmodcount - 1, $newmodcount);
+    }
+
+    /**
+     * Test duplicate_section() with delegated section
+     * @covers     ::duplicate_section
+     */
+    public function test_duplicate_section_with_delegated_sections(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $this->resetAfterTest();
+        // Add subsection.
+        $manager = \core_plugin_manager::resolve_plugininfo_class('mod');
+        $manager::enable_plugin('subsection', 1);
+        $course = $this->getDataGenerator()->create_course(['format' => 'topics', 'numsections' => 1]);
+        $subsection1 = $this->getDataGenerator()->create_module(
+            'subsection', ['course' => $course, 'section' => 1, 'name' => 'subsection1']);
+        $subsection2 = $this->getDataGenerator()->create_module(
+            'subsection', ['course' => $course, 'section' => 1, 'name' => 'subsection2']);
+        $format = course_get_format($course);
+
+        $modinfo = get_fast_modinfo($course);
+        $sectioninfo = $modinfo->get_section_info(1, MUST_EXIST);
+        $originalsectioncount = $DB->count_records('course_sections', ['course' => $course->id]);
+        $this->assertEquals(4, $originalsectioncount);
+
+        $originalsection = $DB->get_record('course_sections',
+            ['course' => $course->id, 'section' => 0],
+            '*',
+            MUST_EXIST);
+        $newsection = $format->duplicate_section($sectioninfo);
+        foreach ($originalsection as $prop => $value) {
+            if ($prop == 'id' || $prop == 'sequence' || $prop == 'section' || $prop == 'timemodified') {
+                continue;
+            }
+            $this->assertEquals($value, $newsection->$prop);
+        }
+        $sectioncount = $DB->count_records('course_sections', ['course' => $course->id]);
+        $this->assertEquals(7, $sectioncount);
     }
 
     /**
@@ -825,7 +868,10 @@ final class base_test extends advanced_testcase {
             $this->expectException(\coding_exception::class);
         }
         $result = $format->get_non_ajax_cm_action_url($action, $cminfo);
-        $this->assertEquals($assign0->cmid, $result->param($expectedparam));
+        if (!$exception) {
+            $this->assertDebuggingCalled();
+        }
+        $this->assertEquals($assign0->cmid, $result->param('id'));
     }
 
     /**
@@ -1034,6 +1080,31 @@ final class base_test extends advanced_testcase {
         $this->assertTrue($format->is_section_visible($modinfostudent->get_section_info(0)));
         $this->assertFalse($format->is_section_visible($modinfostudent->get_section_info(1)));
         $this->assertFalse($format->is_section_visible($modinfostudent->get_section_info(2)));
+    }
+
+    /**
+     * Test for the get_generic_section_name method.
+     *
+     * @covers ::get_generic_section_name
+     */
+    public function test_get_generic_section_name(): void {
+        $this->resetAfterTest();
+
+        $generator = $this->getDataGenerator();
+        $course1 = $generator->create_course(['format' => 'topics']);
+        $course2 = $generator->create_course(['format' => 'theunittest']);
+
+        $format = course_get_format($course1);
+        $this->assertEquals(
+            get_string('sectionname', 'format_topics'),
+            $format->get_generic_section_name()
+        );
+
+        $format = course_get_format($course2);
+        $this->assertEquals(
+            get_string('section'),
+            $format->get_generic_section_name()
+        );
     }
 
     /**

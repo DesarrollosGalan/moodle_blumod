@@ -14,12 +14,12 @@ Feature: Preview a quiz as a teacher
     And the following "course enrolments" exist:
       | user     | course | role           |
       | teacher  | C1     | editingteacher |
-    And the following "question categories" exist:
-      | contextlevel | reference | name           |
-      | Course       | C1        | Test questions |
     And the following "activities" exist:
-      | activity   | name   | intro              | course | idnumber |
-      | quiz       | Quiz 1 | Quiz 1 description | C1     | quiz1    |
+      | activity   | name    | intro              | course | idnumber |
+      | quiz       | Quiz 1  | Quiz 1 description | C1     | quiz1    |
+    And the following "question categories" exist:
+      | contextlevel    | reference | name           |
+      | Activity module | quiz1     | Test questions |
     And the following "questions" exist:
       | questioncategory | qtype       | name  | questiontext    |
       | Test questions   | truefalse   | TF1   | First question  |
@@ -37,10 +37,12 @@ Feature: Preview a quiz as a teacher
   Scenario: Review the quiz attempt
     When I am on the "Quiz 1" "mod_quiz > View" page logged in as "teacher"
     And I follow "Review"
+    And "Attempt 1 summary" "table" should exist
     Then I should see "25.00 out of 100.00"
     And I should see "v1 (latest)" in the "Question 1" "question"
     And I follow "Finish review"
     And "Review" "link" in the "Attempt 1" "list_item" should be visible
+    And "Attempt 1 summary" "table" should exist
 
   @javascript
   Scenario: Review the quiz attempt with custom decimal separator

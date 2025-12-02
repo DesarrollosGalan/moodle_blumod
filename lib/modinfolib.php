@@ -101,6 +101,13 @@ class course_modinfo {
     private ?array $delegatedbycm = null;
 
     /**
+     * Contains the course content weights so they can be sorted accordingly.
+     *
+     * @var array|null
+     */
+    private ?array $weights = null;
+
+    /**
      * User ID
      * @var int
      */
@@ -295,6 +302,40 @@ class course_modinfo {
             return array();
         }
         return $this->instances[$modname];
+    }
+
+    /**
+     * Obtains a single instance of a particular module on this course.
+     *
+     * @param string $modname Name of module (not full frankenstyle) e.g. 'label'
+     * @param int $instanceid Instance id
+     * @param int $strictness Use IGNORE_MISSING to return null if not found, or MUST_EXIST to throw exception
+     * @return cm_info|null cm_info for the instance on this course or null if not found
+     * @throws moodle_exception If the instance is not found
+     */
+    public function get_instance_of(string $modname, int $instanceid, int $strictness = IGNORE_MISSING): ?cm_info {
+        if (empty($this->instances[$modname]) || empty($this->instances[$modname][$instanceid])) {
+            if ($strictness === IGNORE_MISSING) {
+                return null;
+            }
+            throw new moodle_exception('invalidmoduleid', 'error', '', $instanceid);
+        }
+        return $this->instances[$modname][$instanceid];
+    }
+
+    /**
+     * Sorts the given array of course modules according to the order they appear on the course page.
+     *
+     * @param cm_info[] $cms Array of cm_info objects to sort by reference
+     * @return void
+     */
+    public function sort_cm_array(array &$cms): void {
+        $weights = $this->get_content_weights();
+        uasort($cms, function ($a, $b) use ($weights) {
+            $weighta = $weights['cm' . $a->id] ?? PHP_INT_MAX;
+            $weightb = $weights['cm' . $b->id] ?? PHP_INT_MAX;
+            return $weighta <=> $weightb;
+        });
     }
 
     /**
@@ -691,17 +732,6 @@ class course_modinfo {
             }
         }
         ksort($this->sectioninfobynum);
-    }
-
-    /**
-     * This method can not be used anymore.
-     *
-     * @see course_modinfo::build_course_cache()
-     * @deprecated since 2.6
-     */
-    public static function build_section_cache($courseid) {
-        throw new coding_exception('Function course_modinfo::build_section_cache() can not be used anymore.' .
-            ' Please use course_modinfo::build_course_cache() whenever applicable.');
     }
 
     /**
@@ -1149,6 +1179,68 @@ class course_modinfo {
         // Because this is a versioned cache, there is no need to actually delete the cache item,
         // only increase the required version number.
     }
+
+    /**
+     * Can this module type be displayed on a course page or selected from the activity types when adding an activity to a course?
+     *
+     * @param string $modname The module type name
+     * @return bool
+     */
+    public static function is_mod_type_visible_on_course(string $modname): bool {
+        return plugin_supports('mod', $modname, FEATURE_CAN_DISPLAY, true);
+    }
+
+    /**
+     * Get content weights for all sections and modules in the course.
+     *
+     * The weights are calculated based on the order of sections and modules
+     * as they appear on the course page, including delegated sections.
+     *
+     * @return array Associative array with keys 'section{sectionid}' and 'cm{cmid}' and integer weights as values.
+     */
+    private function get_content_weights(): array {
+        if ($this->weights !== null) {
+            return $this->weights;
+        }
+        $result = [];
+        foreach ($this->sectioninfobynum as $section) {
+            // Delegated sections are always at the end of the course and they will
+            // be added only if they are part of any section sequence.
+            if ($section->is_delegated()) {
+                continue;
+            }
+            $sortedelements = $this->calculate_section_weights($section, count($result));
+            $result += $sortedelements;
+        }
+        $this->weights = $result;
+        return $result;
+    }
+
+    /**
+     * Calculate weights for a section and its modules, including delegated sections.
+     *
+     * @param section_info $section The section to calculate weights for.
+     * @param int $currentweight The starting weight to use for this section.
+     * @return section_info[] Associative array of section_info objects, indexed by the cmid of the delegating module.
+     */
+    private function calculate_section_weights(section_info $section, int $currentweight = 0): array {
+        $delegatedcms = $this->get_sections_delegated_by_cm();
+
+        $weights = [
+            'section' . $section->id => $currentweight++,
+        ];
+
+        foreach ($section->get_sequence_cm_infos() as $cm) {
+            $weights['cm' . $cm->id] = $currentweight++;
+
+            if (array_key_exists($cm->id, $delegatedcms)) {
+                $subweights = $this->calculate_section_weights($delegatedcms[$cm->id], $currentweight);
+                $weights += $subweights;
+                $currentweight += count($subweights);
+            }
+        }
+        return $weights;
+    }
 }
 
 
@@ -1470,6 +1562,12 @@ class cm_info implements IteratorAggregate {
      * @var string
      */
     private $iconcomponent;
+
+    /**
+     * The instance record form the module table
+     * @var stdClass
+     */
+    private $instancerecord;
 
     /**
      * Name of module e.g. 'forum' (this is the same name as the module's main database
@@ -2207,6 +2305,25 @@ class cm_info implements IteratorAggregate {
     }
 
     /**
+     * Return the activity database table record.
+     *
+     * The instance record will be cached after the first call.
+     *
+     * @return stdClass
+     */
+    public function get_instance_record() {
+        global $DB;
+        if (!isset($this->instancerecord)) {
+            $this->instancerecord = $DB->get_record(
+                table: $this->modname,
+                conditions: ['id' => $this->instance],
+                strictness: MUST_EXIST,
+            );
+        }
+        return $this->instancerecord;
+    }
+
+    /**
      * Returns the section delegated by this module, if any.
      *
      * @return ?section_info
@@ -2474,8 +2591,8 @@ class cm_info implements IteratorAggregate {
         if (!$cm) {
             return null;
         }
-        // If it is already a cm_info object, just return it.
-        if ($cm instanceof cm_info) {
+        // If it is already a cm_info object with the right user, just return it.
+        if (($cm instanceof cm_info) && ($cm->get_modinfo()->userid == $userid)) {
             return $cm;
         }
         // Otherwise load modinfo.
@@ -2568,6 +2685,15 @@ class cm_info implements IteratorAggregate {
     }
 
     /**
+     * Use this method if you want to check if the plugin overrides any visibility checks to block rendering to the display.
+     *
+     * @return bool
+     */
+    public function is_of_type_that_can_display(): bool {
+        return course_modinfo::is_mod_type_visible_on_course($this->modname);
+    }
+
+    /**
      * Whether this module is available but hidden from course page
      *
      * "Stealth" modules are the ones that are not shown on course page but available by following url.
@@ -2589,18 +2715,6 @@ class cm_info implements IteratorAggregate {
     private function get_available() {
         $this->obtain_dynamic_data();
         return $this->available;
-    }
-
-    /**
-     * This method can not be used anymore.
-     *
-     * @see \core_availability\info_module::filter_user_list()
-     * @deprecated Since Moodle 2.8
-     */
-    private function get_deprecated_group_members_only() {
-        throw new coding_exception('$cm->groupmembersonly can not be used anymore. ' .
-                'If used to restrict a list of enrolled users to only those who can ' .
-                'access the module, consider \core_availability\info_module::filter_user_list.');
     }
 
     /**
@@ -2665,17 +2779,6 @@ class cm_info implements IteratorAggregate {
     }
 
     /**
-     * This method has been deprecated and should not be used.
-     *
-     * @see $uservisible
-     * @deprecated Since Moodle 2.8
-     */
-    public function is_user_access_restricted_by_group() {
-        throw new coding_exception('cm_info::is_user_access_restricted_by_group() can not be used any more.' .
-            ' Use $cm->uservisible to decide whether the current user can access an activity.');
-    }
-
-    /**
      * Checks whether mod/...:view capability restricts the current user's access.
      *
      * @return bool True if the user access is restricted.
@@ -2694,19 +2797,6 @@ class cm_info implements IteratorAggregate {
 
         // You are blocked if you don't have the capability.
         return !has_capability($capability, $this->get_context(), $userid);
-    }
-
-    /**
-     * Checks whether the module's conditional access settings mean that the
-     * user cannot see the activity at all
-     *
-     * @deprecated since 2.7 MDL-44070
-     */
-    public function is_user_access_restricted_by_conditional_access() {
-        throw new coding_exception('cm_info::is_user_access_restricted_by_conditional_access() ' .
-                'can not be used any more; this function is not needed (use $cm->uservisible ' .
-                'and $cm->availableinfo to decide whether it should be available ' .
-                'or appear)');
     }
 
     /**
@@ -2954,11 +3044,8 @@ function get_course_and_cm_from_instance($instanceorid, $modulename, $courseorid
 
     // Get cm from get_fast_modinfo.
     $modinfo = get_fast_modinfo($course, $userid);
-    $instances = $modinfo->get_instances_of($modulename);
-    if (!array_key_exists($instanceid, $instances)) {
-        throw new moodle_exception('invalidmoduleid', 'error', '', $instanceid);
-    }
-    return array($course, $instances[$instanceid]);
+    $instance = $modinfo->get_instance_of($modulename, $instanceid, MUST_EXIST);
+    return [$course, $instance];
 }
 
 
@@ -3682,7 +3769,7 @@ class section_info implements IteratorAggregate {
      * Get the delegate component instance.
      */
     public function get_component_instance(): ?sectiondelegate {
-        if (empty($this->_component)) {
+        if (!$this->is_delegated()) {
             return null;
         }
         if ($this->_delegateinstance !== null) {

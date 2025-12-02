@@ -298,12 +298,14 @@ class renderer extends \plugin_renderer_base {
 
         if (isset($summary->cm)) {
             $currenturl = new \moodle_url('/mod/assign/view.php', array('id' => $summary->cm->id));
-            $o .= groups_print_activity_menu($summary->cm, $currenturl->out(), true);
+            $o .= groups_print_activity_menu($summary->cm, $currenturl->out(), true, participationonly: false);
         }
 
         $o .= $this->output->box_start('boxaligncenter gradingsummarytable');
         $t = new \html_table();
-        $t->attributes['class'] = 'generaltable table-bordered';
+        $t->attributes['class'] = 'generaltable table table-striped table-bordered table-hover';
+        $t->caption = get_string('gradingsummary', 'assign');
+        $t->captionhide = true; // Hidden because it matches the title above.
 
         // Visibility Status.
         $cell1content = get_string('hiddenfromstudents');
@@ -410,6 +412,8 @@ class renderer extends \plugin_renderer_base {
         $o .= $this->output->heading(get_string('feedback', 'assign'), 3);
         $o .= $this->output->box_start('boxaligncenter feedbacktable');
         $t = new \html_table();
+        $t->caption = get_string('feedback', 'assign');
+        $t->captionhide = true; // Hidden because it matches the title above.
 
         // Grade.
         if (isset($status->gradefordisplay)) {
@@ -649,7 +653,9 @@ class renderer extends \plugin_renderer_base {
         $o .= $this->output->box_start('boxaligncenter submissionsummarytable');
 
         $t = new \html_table();
-        $t->attributes['class'] = 'generaltable table-bordered';
+        $t->attributes['class'] = 'generaltable table table-striped table-bordered table-hover';
+        $t->caption = get_string('submissionstatusheading', 'assign');
+        $t->captionhide = true; // Hidden because it matches the title above.
 
         $warningmsg = '';
         if ($status->teamsubmissionenabled) {
@@ -936,6 +942,8 @@ class renderer extends \plugin_renderer_base {
             $o .= $this->heading(get_string('attemptheading', 'assign', $attemptsummaryparams), 4);
 
             $t = new \html_table();
+            $t->caption = get_string('attemptheading', 'assign', $attemptsummaryparams);
+            $t->captionhide = true; // Hidden because it matches the title above.
 
             if ($submission) {
                 $cell1content = get_string('submissionstatus', 'assign');
@@ -1220,10 +1228,19 @@ class renderer extends \plugin_renderer_base {
     /**
      * Render a course index summary
      *
+     * @deprecated since Moodle 5.0 (MDL-83888).
+     * @todo MDL-84429 Final deprecation in Moodle 6.0.
      * @param \assign_course_index_summary $indexsummary
      * @return string
      */
+    #[\core\attribute\deprecated(
+        since: '5.0',
+        mdl: 'MDL-83888',
+        reason: 'The assign_course_index_summary class is not used anymore.',
+    )]
     public function render_assign_course_index_summary(\assign_course_index_summary $indexsummary) {
+        \core\deprecation::emit_deprecation([$this, __FUNCTION__]);
+
         $o = '';
 
         $strplural = get_string('modulenameplural', 'assign');
