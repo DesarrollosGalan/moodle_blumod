@@ -1,0 +1,29 @@
+/**
+ * All styles are built from the file css/styles.css.
+ */
+
+.block_blumod * {
+   /** For older themes. */
+    box-sizing: border-box;
+}
+
+.table-blus {
+    float:left;
+    width: 45%;
+    background-color:#00FF00;
+}
+
+.table-modules {
+    float:right;
+    width: 55%;
+    background-color:#00FF00;
+}
+
+.btn-secondary-blu {
+	margin-top: 0.2rem;
+	margin-bottom: 1rem;
+}
+
+.singlebutton-blu {
+	margin-top: 0.2rem;
+}
