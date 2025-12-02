@@ -443,8 +443,8 @@ class post extends db_table_vault {
         ] = $this->get_private_reply_sql($user, $canseeprivatereplies, "p");
 
         $sql = "
-            SELECT p.*
-            FROM {" . self::TABLE . "} p
+            SELECT posts.*
+            FROM {" . self::TABLE . "} posts
             JOIN (
                 SELECT p.discussion, MAX(p.id) as latestpostid
                 FROM {" . self::TABLE . "} p

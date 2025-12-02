@@ -75,14 +75,6 @@ export const init = async(
 
     const filterSet = document.querySelector(`#${filterRegionId}`);
 
-    const [
-        showAllText,
-        showPerPageText,
-    ] = await Promise.all([
-        getString('showall', 'core', ''),
-        getString('showperpage', 'core', extraparams.defaultqperpage),
-    ]);
-
     const viewData = {
         extraparams: JSON.stringify(extraparams),
         cmid,
@@ -118,27 +110,6 @@ export const init = async(
      * @param {Promise} pendingPromise pending promise
      */
     const applyFilter = (filterdata, pendingPromise) => {
-
-        // MDL-84578 - This is a simple fix for older stable branches, which does not require
-        // backporting loads of functionality to validate filters properly.
-        let categoryid = parseInt(filterdata.category.values[0]);
-        let categorynode = document.querySelector(SELECTORS.CATEGORY_VALIDATION_INPUT);
-        categorynode.setCustomValidity('');
-        if (isNaN(categoryid) || categoryid <= 0) {
-            getStrings([
-                {
-                    key: 'error:category',
-                    component: 'qbank_managecategories',
-                },
-            ]).then((strings) => {
-                categorynode.setCustomValidity(strings[0]);
-                categorynode.reportValidity();
-                return strings;
-            }).catch(Notification.exception);
-            pendingPromise.resolve();
-            return;
-        }
-
         // Reload the questions based on the specified filters. If no filters are provided,
         // use the default category filter condition.
         if (filterdata) {
