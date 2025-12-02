@@ -49,6 +49,7 @@ composer.phar
 atlassian-ide-plugin.xml
 /node_modules/
 /.vscode/
+.vscode
 moodle-plugin-ci.phar
 .eslintignore
 .stylelintignore
