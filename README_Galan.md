@@ -51,7 +51,7 @@ Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Revisar
 
 Será muy similar al indicado para el *Desarrollo local*
 
-### Primera instalación o actualización de verriuón **major** en nueva ruta
+### Primera instalación o actualización de versión **major** en nueva ruta
 
 Se clonará el repo.
 
