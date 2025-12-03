@@ -47,6 +47,35 @@ Esto suele suponer usar el código de una nueva rama del repo original de Moodle
 
 Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Revisar el script bash **sync_upstream_moodle.sh** para ver el detalle de los comandos a ejecutar.
 
+# Actualizar el servidor
+
+Será muy similar al indicado para el *Desarrollo local*
+
+### Primera instalación o actualización de verriuón **major** en nueva ruta
+
+Se clonará el repo.
+
+```
+cd <YOUR_LOCAL_MOODLE_FOLDER>
+git clone https://github.com/DesarrollosGalan/moodle_blumod.git
+git checkout MOODLE_NNN_STABLE
+```
+
+### Actualizar a un versión de Moodle *minor*
+
+Descargar los cambios
+
+```
+cd <YOUR_LOCAL_MOODLE_FOLDER>
+git pull origin MOODLE_NNN_STABLE
+```
+
+, y su hubiera conflictos
+
+```
+cd <YOUR_LOCAL_MOODLE_FOLDER>
+git merge -X theirs origin/MOODLE_NNN_STABLE
+```
 
 # Moodle 4.5 DB Schema
 
