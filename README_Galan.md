@@ -25,7 +25,7 @@ cd <YOUR_LOCAL_MOODLE_FOLDER>
 git remote add upstream git://git.moodle.org/moodle.git
 ```
 
-* Actualizar a un versión de Moodle *minor*
+### Actualizar a un versión de Moodle *minor*
 
 ```
 cd <YOUR_LOCAL_MOODLE_FOLDER>
@@ -41,7 +41,7 @@ cd <YOUR_LOCAL_MOODLE_FOLDER>
 git merge -X theirs upstream/MOODLE_NNN_STABLE
 ```
 
-* Actualizar a una versión de Moodle *major*
+### Actualizar a una versión de Moodle *major*
 
 Esto suele suponer usar el código de una nueva rama del repo original de Moodle
 
