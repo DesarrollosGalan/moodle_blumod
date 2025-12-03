@@ -25,9 +25,28 @@ cd <YOUR_LOCAL_MOODLE_FOLDER>
 git remote add upstream git://git.moodle.org/moodle.git
 ```
 
-* Mantener sync y actualizado este repo con el de Moodle
+* Actualizar a un versión de Moodle *minor*
 
-Únicamente mantenemos sincronizadas una rama *MOODLE_NNN_STABLE*. Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Revisar el script bash **sync_upstream_moodle.sh** para ver el detalle de los comandos a ejecutar.
+```
+cd <YOUR_LOCAL_MOODLE_FOLDER>
+git pull upstream MOODLE_NNN_STABLE
+```
+
+Únicamente mantenemos sincronizadas una rama *MOODLE_NNN_STABLE*.
+
+En el caso de encontrar conflictos, haremos un **merge** indicando que el repo original de Moodle es el que prevalece.
+
+```
+cd <YOUR_LOCAL_MOODLE_FOLDER>
+git merge -X theirs upstream/MOODLE_NNN_STABLE
+```
+
+* Actualizar a una versión de Moodle *major*
+
+Esto suele suponer usar el código de una nueva rama del repo original de Moodle
+
+Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Revisar el script bash **sync_upstream_moodle.sh** para ver el detalle de los comandos a ejecutar.
+
 
 # Moodle 4.5 DB Schema
 
