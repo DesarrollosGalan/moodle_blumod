@@ -15,6 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Language strings definition
  * @package   mod_pdfannotator
  * @copyright 2018 RWTH Aachen (see README.md)
  * @author    Rabea de Groot, Anna Heynkes, Friederike Schwager
@@ -65,6 +66,12 @@ $string['colorPicker'] = 'Pick a color';
 $string['comment'] = 'Comment';
 $string['commentDeleted'] = 'Comment has been deleted';
 $string['comments'] = 'Comments';
+// Annotation separation.
+$string['comments_icon_private'] = 'This comment is private';
+$string['comments_icon_public'] = 'This comment is public';
+$string['comments_text_all'] = 'Show all comments';
+$string['comments_text_private'] = 'Only show private comments (orange)';
+$string['comments_text_public'] = 'Only show public comments (blue)';
 $string['configmaxbytes'] = 'Maximum file size';
 $string['correct'] = 'correct';
 $string['count'] = 'count';
@@ -137,7 +144,10 @@ $string['error:redihideCommentsplayComment'] = 'An error occurred while re-inser
 $string['error:voteComment'] = 'An error has occurred while saving the vote.';
 $string['error'] = 'Error!';
 $string['eventreport_added'] = 'A comment was reported';
-
+$string['export_comments_csv'] = 'Export as CSV';
+$string['export_comments_csv_tooltip'] = 'Download comments as CSV file';
+$string['export_comments_pdf'] = 'Export as PDF';
+$string['export_comments_pdf_tooltip'] = 'Download comments as PDF file';
 $string['filenotfound'] = 'File not found, sorry.';
 $string['forward'] = 'Forward';
 $string['forwardedquestionhtml'] = '{$a->sender} forwarded the following question to you: <br /> <br />
@@ -462,7 +472,7 @@ $string['successfullymarkedasunread'] = 'The report was marked as unread.';
 $string['successfullymarkedasunreadandnolongerdisplayed'] = 'The report was marked as unread and removed from the table.';
 $string['successfullyRedisplayed'] = 'The comment is visible to participants once more';
 $string['successfullySubscribed'] = 'Subscribed to question.';
-$string['successfullySubscribed'] = 'Your subscription to the question was registered.';
+$string['successfullySubscribednotify'] = 'Your subscription to the question was registered.';
 $string['successfullyUnsubscribed'] = 'Your subscribtion was cancelled.';
 $string['successfullyUnsubscribedPlural'] = 'Your subscribtion was cancelled. All {$a} answers to the question were removed from this table.';
 $string['successfullyUnsubscribedSingular'] = 'Your subscribtion to the question was cancelled and the only answer removed from this table.';

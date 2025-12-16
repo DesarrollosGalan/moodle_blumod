@@ -338,13 +338,13 @@ if ($action === 'addComment') {
     // Get the comment data.
     $content = required_param('content', PARAM_RAW);
     $regex = "/?time=[0-9]*/";
-    $extracted_content = str_replace($regex, "", $content);
+    $extractedcontent = str_replace($regex, "", $content);
 
     $visibility = required_param('visibility', PARAM_ALPHA);
     $isquestion = required_param('isquestion', PARAM_INT);
 
     // Insert the comment into the mdl_pdfannotator_comments table and get its record id.
-    $comment = pdfannotator_comment::create($documentid, $annotationid, $extracted_content, $visibility, $isquestion, $cm, $context);
+    $comment = pdfannotator_comment::create($documentid, $annotationid, $extractedcontent, $visibility, $isquestion, $cm, $context);
 
     // If successful, create a comment array and return it as json.
     if ($comment) {
@@ -437,9 +437,9 @@ if ($action === 'editComment') {
     $commentid = required_param('commentId', PARAM_INT);
     $content = required_param('content', PARAM_RAW);
     $regex = "/?time=[0-9]*/";
-    $extracted_content = str_replace($regex, "", $content);
+    $extractedcontent = str_replace($regex, "", $content);
 
-    $data = pdfannotator_comment::update($commentid, $extracted_content, $editanypost, $context);
+    $data = pdfannotator_comment::update($commentid, $extractedcontent, $editanypost, $context);
     echo json_encode($data);
 }
 
@@ -614,20 +614,24 @@ if ($action === 'getCommentsToPrint') {
         $count = 0;
         foreach ($conversations as $conversation) {
             $post = new stdClass();
+            $post->rawAnsweredquestion = $conversation->answeredquestion;
             $post->answeredquestion = pdfannotator_handle_latex($context, $conversation->answeredquestion);
             $post->answeredquestion = pdfannotator_extract_images($post->answeredquestion, $conversation->id, $context);
             $post->page = $conversation->page;
             $post->annotationtypeid = $conversation->annotationtypeid;
             $post->author = $conversation->author;
+            $post->id = $conversation->id;
             $post->timemodified = $conversation->timemodified;
             $post->answers = [];
 
             $answercount = 0;
             foreach ($conversation->answers as $ca) {
                 $answer = new stdClass();
+                $answer->rawAnswer = $ca->answer;
                 $answer->answer = pdfannotator_handle_latex($context, $ca->answer);
                 $answer->answer = pdfannotator_extract_images($answer->answer, $ca->id, $context);
                 $answer->author = $ca->author;
+                $answer->id = $ca->id;
                 $answer->timemodified = $ca->timemodified;
                 $post->answers[$answercount] = $answer;
                 $answercount++;

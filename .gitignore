@@ -21,6 +21,8 @@
 #
 /config.php
 /config_platform_ehu.php
+/public/config.php
+/public/config_platform_ehu.php
 /tags
 /TAGS
 /cscope.*
