@@ -82,11 +82,11 @@ SELECT
  modules.name AS modulename
 FROM {block_blumod} blumod
 LEFT JOIN {block_blu} blu ON blu.id = blumod.blu
-     JOIN {course_modules} cm ON cm.id = blumod.module
+LEFT JOIN {course_modules} cm ON cm.id = blumod.module
 LEFT JOIN {modules} modules ON modules.id = cm.module
 LEFT JOIN {block_blucompetency} blucompetency ON blucompetency.bluid = blu.id
 LEFT JOIN {competency} competency ON blucompetency.competencyid = competency.id
-WHERE blu.course = :courseid AND cm.deletioninprogress = :deletioninprogress
+WHERE blu.course = :courseid AND ( cm.deletioninprogress = :deletioninprogress OR cm.deletioninprogress IS NULL )
 ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competencyid ASC;
         ";
         $params = ['courseid' => $this->courseid,'deletioninprogress' => '0'];
@@ -94,8 +94,14 @@ ORDER BY blu.course ASC, blu.id ASC, blumod.module ASC, blucompetency.competency
 
         $data = [];
         foreach ($results as $result) {
-            $resource_name = $DB->get_record($result->modulename,['id'=>$result->cminstance]);
-            $resource_name_to_data = $result->modulename . ': ' . $resource_name->name;
+            if ($result->modulename === NULL) {
+                $resource_name = $DB->get_record('grade_items',['id'=>$result->blumodmodule]);
+                $resource_name_to_data = 'Calificador' . ': ' . $resource_name->itemname;
+            } else {
+                $resource_name = $DB->get_record($result->modulename,['id'=>$result->cminstance]);
+                $resource_name_to_data = $result->modulename . ': ' . $resource_name->name;
+            }
+            
             $data[] = [
                 $result->bluid,
                 $result->bluname,

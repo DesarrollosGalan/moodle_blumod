@@ -1,7 +1,7 @@
 moodle-block_people
 ===================
 
-[![Moodle Plugin CI](https://github.com/moodle-an-hochschulen/moodle-block_people/workflows/Moodle%20Plugin%20CI/badge.svg?branch=main)](https://github.com/moodle-an-hochschulen/moodle-block_people/actions?query=workflow%3A%22Moodle+Plugin+CI%22+branch%3Amain)
+[![Moodle Plugin CI](https://github.com/moodle-an-hochschulen/moodle-block_people/actions/workflows/moodle-plugin-ci.yml/badge.svg?branch=main)](https://github.com/moodle-an-hochschulen/moodle-block_people/actions?query=workflow%3A%22Moodle+Plugin+CI%22+branch%3Amain)
 
 Moodle block which displays all teachers of a course with contact quicklinks, as well as a quicklink to the participants list
 
@@ -9,7 +9,7 @@ Moodle block which displays all teachers of a course with contact quicklinks, as
 Requirements
 ------------
 
-This plugin requires Moodle 4.5+
+This plugin requires Moodle 5.1+
 
 
 Motivation for this plugin
