@@ -21,11 +21,12 @@ $string['pluginname'] = 'BLU block';
 $string['saved'] = 'Data saved';
 $string['deleted'] = 'Data deleted';
 $string['blus'] = 'BLUs';
-$string['preselectors'] = 'This BLU has the following requirements';
+$string['preselectors'] = 'This BLU has the following prerequisites';
 $string['subselectors'] = 'This BLU consists of ';
 $string['availableresources'] = 'Available Resources';
 $string['assignedresources'] = 'Assigned Resources';
 $string['reportblumod'] = 'In-course BLUs related report';
 $string['assigncompetencies'] = 'Assign competencies to BLUs';
 $string['availablecompetencies'] = 'Available Competencies';
+
 $string['assignedcompetencies'] = 'Assigned Competencies';
