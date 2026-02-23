@@ -62,3 +62,4 @@ phpcs.xml
 jsconfig.json
 UPGRADING-CURRENT.md
 .phpunit.cache
+public/config_platform_ehu.php
