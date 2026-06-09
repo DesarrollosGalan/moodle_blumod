@@ -77,6 +77,16 @@ cd <YOUR_LOCAL_MOODLE_FOLDER>
 git merge -X theirs origin/MOODLE_NNN_STABLE
 ```
 
+### Plugins utilizados
+
+La siguiente lista de plugins debe de actualizarse con el cambio de versión major:
+
+```
+block_completion_progress
+block_xp
+theme_moove
+```
+
 # Moodle 4.5 DB Schema
 
 https://www.examulator.com/er/4.5/index.html
