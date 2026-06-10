@@ -1,105 +1,31 @@
-<?php  // Moodle configuration file
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-unset($CFG);
-global $CFG;
-$CFG = new stdClass();
+/**
+ * Moodle configuration loader.
+ *
+ * @package    core
+ * @copyright  2024 Andrew Lyons <andrew@nicols.co.uk>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
-$CFG->auth      = "manual";
-$CFG->dbtype    = getenv('MOODLE_DOCKER_DBTYPE');
-$CFG->dblibrary = 'native';
-$CFG->dbhost    = 'db';
-$CFG->dbname    = getenv('MOODLE_DOCKER_DBNAME');
-$CFG->dbuser    = getenv('MOODLE_DOCKER_DBUSER');
-$CFG->dbpass    = getenv('MOODLE_DOCKER_DBPASS');
-$CFG->prefix    = 'mdl_';
-$CFG->dboptions = ['dbcollation' => getenv('MOODLE_DOCKER_DBCOLLATION')];
-
-$host = 'localhost';
-if (!empty(getenv('MOODLE_DOCKER_WEB_HOST'))) {
-    $host = getenv('MOODLE_DOCKER_WEB_HOST');
-}
-$CFG->wwwroot   = "http://{$host}";
-$port = getenv('MOODLE_DOCKER_WEB_PORT');
-if (!empty($port)) {
-    // Extract port in case the format is bind_ip:port.
-    $parts = explode(':', $port);
-    $port = end($parts);
-    if ((string)(int)$port === (string)$port) { // Only if it's int value.
-        $CFG->wwwroot .= ":{$port}";
-    }
-}
-$CFG->dataroot  = '/var/www/moodledata';
-$CFG->admin     = 'admin';
-$CFG->directorypermissions = 0777;
-$CFG->smtphosts = 'mailhog:1025';
-$CFG->noreplyaddress = 'noreply@example.com';
-
-// Debug options - possible to be controlled by flag in future..
-// $CFG->debug = (E_ALL); // DEBUG_DEVELOPER
-// $CFG->debugdisplay = 1;
-// $CFG->debugstringids = 1; // Add strings=1 to url to get string ids.
-// $CFG->perfdebug = 15;
-// $CFG->debugpageinfo = 1;
-// $CFG->cachejs = false; // NOT FOR PRODUCTION SERVERS!
-// $CFG->cachetemplates = false; // NOT FOR PRODUCTION SERVERS!
-// $CFG->langstringcache = false; // NOT FOR PRODUCTION SERVERS!
-// $CFG->allowthemechangeonurl = 1;
-// $CFG->passwordpolicy = 0;
-// $CFG->cronclionly = 0;
-// $CFG->pathtophp = '/usr/local/bin/php';
-
-$CFG->phpunit_dataroot  = '/var/www/phpunitdata';
-$CFG->phpunit_prefix = 't_';
-define('TEST_EXTERNAL_FILES_HTTP_URL', 'http://exttests:9000');
-define('TEST_EXTERNAL_FILES_HTTPS_URL', 'http://exttests:9000');
-
-$CFG->behat_wwwroot   = 'http://webserver';
-$CFG->behat_dataroot  = '/var/www/behatdata';
-$CFG->behat_prefix = 'b_';
-$CFG->behat_profiles = array(
-    'default' => array(
-        'browser' => getenv('MOODLE_DOCKER_BROWSER'),
-        'wd_host' => 'http://selenium:4444/wd/hub',
-    ),
-);
-$CFG->behat_faildump_path = '/var/www/behatfaildumps';
-
-define('PHPUNIT_LONGTEST', true);
-
-if (getenv('MOODLE_DOCKER_APP')) {
-    $appport = getenv('MOODLE_DOCKER_APP_PORT') ?: 8100;
-
-    $CFG->behat_ionic_wwwroot = "http://moodleapp:$appport";
+$configfile = __DIR__ . '/../config.php';
+if (!file_exists($configfile)) {
+    header("Location: install.php");
+    die;
 }
 
-if (getenv('MOODLE_DOCKER_PHPUNIT_EXTRAS')) {
-    define('TEST_SEARCH_SOLR_HOSTNAME', 'solr');
-    define('TEST_SEARCH_SOLR_INDEXNAME', 'test');
-    define('TEST_SEARCH_SOLR_PORT', 8983);
-
-    define('TEST_SESSION_REDIS_HOST', 'redis');
-    define('TEST_CACHESTORE_REDIS_TESTSERVERS', 'redis');
-
-    define('TEST_CACHESTORE_MONGODB_TESTSERVER', 'mongodb://mongo:27017');
-
-    define('TEST_CACHESTORE_MEMCACHED_TESTSERVERS', "memcached0:11211\nmemcached1:11211");
-    define('TEST_CACHESTORE_MEMCACHE_TESTSERVERS', "memcached0:11211\nmemcached1:11211");
-
-    define('TEST_LDAPLIB_HOST_URL', 'ldap://ldap');
-    define('TEST_LDAPLIB_BIND_DN', 'cn=admin,dc=openstack,dc=org');
-    define('TEST_LDAPLIB_BIND_PW', 'password');
-    define('TEST_LDAPLIB_DOMAIN', 'ou=Users,dc=openstack,dc=org');
-
-    define('TEST_AUTH_LDAP_HOST_URL', 'ldap://ldap');
-    define('TEST_AUTH_LDAP_BIND_DN', 'cn=admin,dc=openstack,dc=org');
-    define('TEST_AUTH_LDAP_BIND_PW', 'password');
-    define('TEST_AUTH_LDAP_DOMAIN', 'ou=Users,dc=openstack,dc=org');
-
-    define('TEST_ENROL_LDAP_HOST_URL', 'ldap://ldap');
-    define('TEST_ENROL_LDAP_BIND_DN', 'cn=admin,dc=openstack,dc=org');
-    define('TEST_ENROL_LDAP_BIND_PW', 'password');
-    define('TEST_ENROL_LDAP_DOMAIN', 'ou=Users,dc=openstack,dc=org');
-}
-
-require_once(__DIR__ . '/config_platform_ehu.php');
-require_once(__DIR__ . '/lib/setup.php');
+require_once($configfile);

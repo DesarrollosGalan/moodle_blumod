@@ -49,11 +49,13 @@ Si queremos cambiar de versión basta con cambiar la rama a sincronizar. Revisar
 
 # Actualizar el servidor
 
-Será muy similar al indicado para el *Desarrollo local*
+Será muy similar al indicado para el *Desarrollo local*.
 
-### Primera instalación o actualización de versión **major** en nueva ruta
+La manera más sencilla es tener vinculados los repos de GitHub con el que hay en el servidor de manera que vale para cualqueir tipo de actualización.
 
-Se clonará el repo.
+### Primera instalación
+
+Clonar el repo:
 
 ```
 cd <YOUR_LOCAL_MOODLE_FOLDER>
@@ -61,7 +63,7 @@ git clone https://github.com/DesarrollosGalan/moodle_blumod.git
 git checkout MOODLE_NNN_STABLE
 ```
 
-### Actualizar a un versión de Moodle *minor*
+### Actualizar a un versión de Moodle superior, tanto *minor* como *major*
 
 Descargar los cambios
 
@@ -76,6 +78,8 @@ git pull origin MOODLE_NNN_STABLE
 cd <YOUR_LOCAL_MOODLE_FOLDER>
 git merge -X theirs origin/MOODLE_NNN_STABLE
 ```
+
+Con estos pasos ya se puede entrar en la interfaz y seguir las indicaciones que proponga la interfaz.
 
 ### Plugins utilizados
 
