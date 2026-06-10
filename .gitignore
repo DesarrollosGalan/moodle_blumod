@@ -61,3 +61,7 @@ jsconfig.json
 UPGRADING-CURRENT.md
 .phpunit.cache
 tsconfig.aliases.json
+.github/
+.esbuild/
+.grunt/
+.vscode/

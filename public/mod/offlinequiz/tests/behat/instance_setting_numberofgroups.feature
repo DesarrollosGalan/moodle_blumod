@@ -1,0 +1,62 @@
+@mod @mod_offlinequiz @createforms @amc
+Feature: Within a moodle instance, a teacher should be able to create all forms of the offline quiz for 6 groups.
+  In order to create the forms of an offline quiz
+  As a teacher
+  I need to be able to add an offline quiz, set the value for groups via the settings, add some existing questions and finally create the forms for 6 groups.
+
+  Background:
+    Given the following "users" exist:
+      | username | firstname | lastname | email |
+      | teacher1 | Teacher | 1 | teacher1@example.com |
+    And the following "courses" exist:
+      | fullname | shortname | category | groupmode |
+      | Course 1 | C1 | 0 | 1|
+    And the following "course enrolments" exist:
+      | user | course | role |
+      | teacher1 | C1 | editingteacher |
+    And the following "question categories" exist:
+      | contextlevel | reference | name           |
+      | Course       | C1        | Test questions |
+    And the following "questions" exist:
+      | questioncategory | qtype       | name             | template    |
+      | Test questions   | multichoice | Multi-choice-001 | two_of_four |
+
+  @javascript
+  Scenario: Login as a teacher, add a new offlinequiz to a course and set the value for groups to 6. Then add there some multiple choice questions and create the forms for all groups within the offline quiz.
+    Given I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    And I switch editing mode on
+    And I add a offlinequiz activity to course "Course 1" section "1" and I fill the form with:
+      | Offline quiz name | testofflinequiz |
+      | Description | Add an offline quiz and multiple choice questions to create files for 6 groups |
+      | Number of groups | 6 |
+    And I am on the "testofflinequiz" "offlinequiz activity" page logged in as teacher1
+    And the following questions are added to the offlinequiz "testofflinequiz"
+      | questioncategory | qtype       | questionname     | group |
+      | Test questions   | multichoice | Multi-choice-001 | A     |
+      | Test questions   | multichoice | Multi-choice-001 | B     |
+      | Test questions   | multichoice | Multi-choice-001 | C     |
+      | Test questions   | multichoice | Multi-choice-001 | D     |
+      | Test questions   | multichoice | Multi-choice-001 | E     |
+      | Test questions   | multichoice | Multi-choice-001 | F     |
+    And I navigate to "Offline quiz" in current page administration
+    And I follow "Forms"
+    And I press "Create forms"
+    Then I should see "Question form for group A"
+    Then I should see "Question form for group B"
+    Then I should see "Question form for group C"
+    Then I should see "Question form for group D"
+    Then I should see "Question form for group E"
+    Then I should see "Question form for group F"
+    Then I should see "Answer form for group A"
+    Then I should see "Answer form for group B"
+    Then I should see "Answer form for group C"
+    Then I should see "Answer form for group D"
+    Then I should see "Answer form for group E"
+    Then I should see "Answer form for group F"
+    Then I should see "Correction form for group A"
+    Then I should see "Correction form for group B"
+    Then I should see "Correction form for group C"
+    Then I should see "Correction form for group D"
+    Then I should see "Correction form for group E"
+    Then I should see "Correction form for group F"

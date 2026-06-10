@@ -25,8 +25,12 @@ $string['preselectors'] = 'This BLU has the following prerequisites';
 $string['subselectors'] = 'This BLU consists of ';
 $string['availableresources'] = 'Available Resources';
 $string['assignedresources'] = 'Assigned Resources';
+$string['searchresources'] = 'Search resources';
+$string['searchresourcesplaceholder'] = 'Type at least 3 characters to filter available resources';
 $string['reportblumod'] = 'In-course BLUs related report';
 $string['assigncompetencies'] = 'Assign competencies to BLUs';
 $string['availablecompetencies'] = 'Available Competencies';
+$string['searchcompetencies'] = 'Search competencies';
+$string['searchcompetenciesplaceholder'] = 'Type at least 3 characters to filter available competencies';
 
 $string['assignedcompetencies'] = 'Assigned Competencies';

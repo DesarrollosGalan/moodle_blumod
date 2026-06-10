@@ -1,0 +1,2810 @@
+<?php
+// This file is part of mod_offlinequiz for Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Internal library of functions for module offlinequiz
+ *
+ * All the offlinequiz specific functions, needed to implement the module
+ * logic, should go here. Never include this file from your lib.php!
+ *
+ * @package       mod_offlinequiz
+ * @subpackage    offlinequiz
+ * @author        Juergen Zimmer <zimmerj7@univie.ac.at>
+ * @copyright     2015 Academic Moodle Cooperation {@link http://www.academic-moodle-cooperation.org}
+ * @since         Moodle 2.2+
+ * @license       http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+use mod_offlinequiz\question\engine\offlinequiz_question_usage_by_activity;
+use offlinequiz_correct\table\partlist_table;
+defined('MOODLE_INTERNAL') || die();
+
+require_once($CFG->libdir . '/filelib.php');
+require_once($CFG->dirroot . '/question/editlib.php');
+require_once($CFG->dirroot . '/question/format.php');
+require_once($CFG->dirroot . '/question/engine/questionusage.php');
+
+// These are the old error codes from the Moodle 1.9 module. We still need them for migration.
+define("OFFLINEQUIZ_IMPORT_LMS", "1");
+define("OFFLINEQUIZ_IMPORT_OK", "0");
+define("OFFLINEQUIZ_IMPORT_CORRECTED", "1");
+define("OFFLINEQUIZ_IMPORT_DOUBLE", "2");
+define("OFFLINEQUIZ_IMPORT_ITEM_ERROR", "3");
+define("OFFLINEQUIZ_IMPORT_DOUBLE_ERROR", "11");
+define("OFFLINEQUIZ_IMPORT_USER_ERROR", "12");
+define("OFFLINEQUIZ_IMPORT_GROUP_ERROR", "13");
+define("OFFLINEQUIZ_IMPORT_FATAL_ERROR", "14");
+define("OFFLINEQUIZ_IMPORT_INSECURE_ERROR", "15");
+define("OFFLINEQUIZ_IMPORT_PAGE_ERROR", "16");
+define("OFFLINEQUIZ_IMPORT_SINGLE_ERROR", "17"); // This is not really an error.
+// It occures, when multipage answer sheets are scanned.
+define("OFFLINEQUIZ_IMPORT_DOUBLE_PAGE_ERROR", "18"); // New error for double pages (e.g. page 2 occurs twice for as student).
+define("OFFLINEQUIZ_IMPORT_DIFFERING_PAGE_ERROR", "19"); // New error for double pages that have different results (rawdata).
+
+// Codes for lists of participants.
+define("OFFLINEQUIZ_PART_FATAL_ERROR", "21");   // Over 20 indicates, it is a participants error.
+define("OFFLINEQUIZ_PART_INSECURE_ERROR", "22");
+define("OFFLINEQUIZ_PART_USER_ERROR", "23");
+define("OFFLINEQUIZ_PART_LIST_ERROR", "24");
+define("OFFLINEQUIZ_IMPORT_NUMUSERS", "50");
+
+define('OFFLINEQUIZ_USER_FORMULA_REGEXP', "/^([^\[]*)\[([\-]?[0-9]+)\]([^\=]*)=([a-z]+[0-9]?)$/");
+
+define('OFFLINEQUIZ_GROUP_LETTERS', "ABCDEFGHIJKL");  // Letters for naming offlinequiz groups.
+
+define('OFFLINEQUIZ_PDF_FORMAT', 0);   // PDF file format for question sheets.
+define('OFFLINEQUIZ_DOCX_FORMAT', 1);  // DOCX file format for question sheets.
+define('OFFLINEQUIZ_LATEX_FORMAT', 2);  // LATEX file format for question sheets.
+
+define('OFFLINEQUIZ_QUESTIONINFO_NONE', 0); // No info is printed.
+define('OFFLINEQUIZ_QUESTIONINFO_QTYPE', 1); // The question type is printed.
+define('OFFLINEQUIZ_QUESTIONINFO_ANSWERS', 2); // The number of correct answers is printed.
+
+define('NUMBERS_PER_PAGE', 30);        // Number of students on participants list.
+define('OQ_IMAGE_WIDTH', 860);         // Width of correction form.
+
+
+/**
+ * Print the tertiary menu for offlinequiz using navigation_node structure.
+ * Get sibbling nodes of current active node and render them as select object.
+ * @param mixed $offlinequiz
+ * @param mixed $currenttab
+ * @param mixed $cm
+ * @return void
+ */
+function offlinequiz_print_tabs($offlinequiz, $currenttab, $cm) {
+    global $CFG, $OUTPUT, $PAGE;
+    if (empty($offlinequiz) || empty($currenttab) || empty($cm)) {
+        return;
+    }
+    $secondarynav = offlinequiz_get_tabs_object($offlinequiz, $cm);
+    // Print tertiary navigation from secondarynav.
+
+    // Get current node.
+    $node = $secondarynav->find($currenttab, navigation_node::TYPE_CUSTOM);
+    if (!$node) {
+        return;
+    }
+
+    if (get_config('offlinequiz', 'usetabs')) {
+        foreach ($node->get_siblings() as $child) {
+            $title = isset($child->text) ? $child->text : get_string($child->key, 'offlinequiz');
+            $tabobj = new \core\output\tabobject($child->key, $child->action->out(), $title);
+            $toprow[] = $tabobj;
+        }
+        echo $OUTPUT->tabtree($toprow, $currenttab);
+    } else {
+        // Render sibbling.
+        $options = [];
+        foreach ($node->get_siblings() as $child) {
+                $options[$child->action->out()] = $child->text;
+        }
+        $selectobject = new \url_select($options, $node->action->out(), false);
+        echo $OUTPUT->render($selectobject);
+    }
+}
+
+/**
+ * Populate the tertiary navigation structure for offlinequiz.
+ * Tab structure is defined using navigation_node objects.
+ * Navigation hierarchy has nodes with keys:
+ *  mod_offlinequiz_edit ==> tabofflinequizcontent -> Preparation
+ *    - tabeditgroupquestions
+ *    - tabpreview
+ *  mod_offlinequiz_participants ==> tabattendances -> Participants
+ *    - tabparticipantlists ==> mode=editparticipants
+ *    - tabeditparticipants ==> mode=editlists
+ *    - tabdownloadparticipantsforms
+ *    - tabparticipantsupload
+ *    - tabparticipantscorrect
+ *    - tabattendancesoverview
+ *  mod_offlinequiz_results ==> results
+ *  mod_offlinequiz_attendances ==> attendances
+ *  mod_offlinequiz_statistics ==> statistics
+ * Subplugins can add their own nodes to the navigation tree.
+ *
+ * @param mixed $offlinequiz
+ * @param mixed $cm
+ * @return mixed navigation_node|bool
+ */
+function offlinequiz_get_tabs_object($offlinequiz, $cm): navigation_node {
+    global $CFG, $PAGE;
+    if (empty($offlinequiz) || empty($cm)) {
+        return false;
+    }
+
+    $secondarynav = $PAGE->secondarynav;
+    // Populate Predefined tabs.
+
+    // Populate "Preparation" tab.
+    $preparationnode = $secondarynav->get('mod_offlinequiz_edit');
+    if ($preparationnode) {
+        // Add "Questions" (Edit group questions) tab.
+        if (has_capability('mod/offlinequiz:manage', context_module::instance($cm->id))) {
+            $preparationnode->add(
+                text: get_string('tabeditgroupquestions', 'offlinequiz'),
+                action: new moodle_url('/mod/offlinequiz/edit.php', ['cmid' => $cm->id, 'gradetool' => 0, 'groupnumber' => 1]),
+                key: 'tabeditgroupquestions'
+            );
+        }
+        // Add "Forms Preview" tab.
+        $preparationnode->add(
+            text: get_string('tabpreview', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/navigate.php', ['tab' => 'tabforms', 'id' => $cm->id]),
+            key: 'tabpreview'
+        );
+    }
+    // Populate participants tab if it exists. Participants menu exists if "record attendance" is enabled.
+    $participantsnode = $secondarynav->get('mod_offlinequiz_participants');
+    if ($participantsnode) {
+        // Add "Edit lists" tab.
+        $participantsnode->add(
+            text: get_string('tabparticipantlists', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'editlists']),
+            key: 'tabparticipantlists'
+        );
+        // Add "Edit participants" tab.
+        $participantsnode->add(
+            text: get_string('tabeditparticipants', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'editparticipants']),
+            key: 'tabeditparticipants'
+        );
+        // Add "Create PDFs" tab.
+        $participantsnode->add(
+            text: get_string('tabdownloadparticipantsforms', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'createpdfs']),
+            key: 'tabdownloadparticipantsforms'
+        );
+        // Add "Upload" tab.
+        $participantsnode->add(
+            text: get_string('tabparticipantsupload', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'upload']),
+            key: 'tabparticipantsupload'
+        );
+        // Add "Correct" tab.
+        $participantsnode->add(
+            text: get_string('tabparticipantscorrect', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'correct']),
+            key: 'tabparticipantscorrect'
+        );
+        // Add "Attendances" tab.
+        $participantsnode->add(
+            text: get_string('attendances', 'offlinequiz'),
+            action: new moodle_url('/mod/offlinequiz/participants.php', ['q' => $offlinequiz->id, 'mode' => 'attendances']),
+            key: 'tabattendancesoverview'
+        );
+    }
+
+    // Add navigation from subplugins.
+    $subplugins = \core_component::get_plugin_list('offlinequiz');
+    foreach ($subplugins as $subplugin => $subpluginpath) {
+        // Instantiate the subplugin.
+        $reportclass = offlinequiz_instantiate_report_class($subplugin);
+        if ($reportclass && method_exists($reportclass, 'add_to_navigation')) {
+            $reportclass->add_to_navigation($secondarynav, $cm, $offlinequiz);
+        }
+    }
+
+    return $secondarynav;
+}
+/**
+ * instanciate a report class for a certain offlinequiz report subplugin
+ * @param mixed $subpluginname
+ * @return bool|object
+ */
+function offlinequiz_instantiate_report_class($subpluginname): mixed {
+    // Check if class exists.
+    $class = "offlinequiz_{$subpluginname}\\report";
+    if (class_exists($class)) {
+        return new $class();
+    } else {
+        return false;
+    }
+}
+/**
+ * create a quba instance
+ * @param mixed $component
+ * @param mixed $context
+ * @return offlinequiz_question_usage_by_activity
+ */
+function offlinequiz_make_questions_usage_by_activity($component, $context) {
+    return new offlinequiz_question_usage_by_activity($component, $context);
+}
+/**
+ * get the pdf font of a certain oq
+ * @param stdClass $offlinequiz
+ */
+function offlinequiz_get_pdffont($offlinequiz = null) {
+    $offlinequizconfig = get_config('offlinequiz');
+    if (!$offlinequiz) {
+        $id = optional_param('id', 0, PARAM_INT);               // Course Module ID.
+        $q = optional_param('q', 0, PARAM_INT);                 // Or offlinequiz ID.
+        if ($id || $q) {
+            [$offlinequiz, $course, $cm] = get_course_objects($id, $q);
+        }
+    }
+    if ($offlinequiz && property_exists($offlinequiz, 'pdffont')) {
+        return $offlinequiz->pdffont;
+    } else if ($offlinequizconfig && $offlinequizconfig->defaultpdffont) {
+        return $offlinequizconfig->defaultpdffont;
+    } else {
+        // Default fallback if anything goes horribly wrong.
+        return 'freeserif';
+    }
+}
+/**
+ * get course objects for certain oq parameters
+ * @param int $id the cm id
+ * @param int $q the offlinequiz id
+ * @throws \moodle_exception
+ * @return array<bool|mixed|stdClass>
+ */
+function get_course_objects($id, $q) {
+    global $DB;
+    if ($id) {
+        if (!$cm = get_coursemodule_from_id('offlinequiz', $id)) {
+            throw new \moodle_exception("There is no coursemodule with id $id");
+        }
+        if (!$course = $DB->get_record("course", ['id' => $cm->course])) {
+            throw new \moodle_exception("Course is misconfigured");
+        }
+        if (!$offlinequiz = $DB->get_record("offlinequiz", ['id' => $cm->instance])) {
+            throw new \moodle_exception("The offlinequiz with id $cm->instance corresponding to this coursemodule $id is missing");
+        }
+    } else {
+        if (!$offlinequiz = $DB->get_record("offlinequiz", ['id' => $q])) {
+            throw new \moodle_exception("There is no offlinequiz with id $q");
+        }
+        if (!$course = $DB->get_record("course", ['id' => $offlinequiz->course])) {
+            throw new \moodle_exception(
+                "The course with id $offlinequiz->course that the offlinequiz with id $q belongs to is missing"
+            );
+        }
+        if (!$cm = get_coursemodule_from_instance('offlinequiz', $offlinequiz->id, $course->id)) {
+            throw new \moodle_exception("The course module for the offlinequiz with id $q is missing");
+        }
+    }
+    return [$offlinequiz, $course, $cm];
+}
+
+/**
+ * Load a question_usage_by_activity from the database, including
+ * all its question_attempt and all their steps.
+ * @param int $qubaid the id of the usage to load.
+ */
+function offlinequiz_load_questions_usage_by_activity($qubaid) {
+    global $DB;
+
+    $records = $DB->get_recordset_sql("
+            SELECT quba.id AS qubaid,
+                   quba.contextid,
+                   quba.component,
+                   quba.preferredbehaviour,
+                   qa.id AS questionattemptid,
+                   qa.questionusageid,
+                   qa.slot,
+                   qa.behaviour,
+                   qa.questionid,
+                   qa.variant,
+                   qa.maxmark,
+                   qa.minfraction,
+                   qa.maxfraction,
+                   qa.flagged,
+                   qa.questionsummary,
+                   qa.rightanswer,
+                   qa.responsesummary,
+                   qa.timemodified,
+                   qas.id AS attemptstepid,
+                   qas.sequencenumber,
+                   qas.state,
+                   qas.fraction,
+                   qas.timecreated,
+                   qas.userid,
+                   qasd.name,
+                   qasd.value
+              FROM {question_usages}            quba
+         LEFT JOIN {question_attempts}          qa   ON qa.questionusageid    = quba.id
+         LEFT JOIN {question_attempt_steps}     qas  ON qas.questionattemptid = qa.id
+         LEFT JOIN {question_attempt_step_data} qasd ON qasd.attemptstepid    = qas.id
+            WHERE  quba.id = :qubaid
+          ORDER BY qa.slot,
+                   qas.sequencenumber
+            ", ['qubaid' => $qubaid]);
+
+    if (!$records->valid()) {
+        throw new coding_exception('Failed to load questions_usage_by_activity ' . $qubaid);
+    }
+
+    $quba = offlinequiz_question_usage_by_activity::load_from_records($records, $qubaid);
+    $records->close();
+
+    return $quba;
+}
+
+/**
+ *
+ * @param stdClass $offlinequiz
+ * @param int $groupid
+ * @return array
+ */
+function offlinequiz_get_group_question_ids($offlinequiz, $groupid = 0) {
+    global $DB;
+
+    if (!$groupid) {
+        $groupid = $offlinequiz->groupid;
+    }
+
+    // This query only makes sense if it is restricted to a offline group.
+    if (!$groupid) {
+        return [];
+    }
+
+    $sql = "SELECT questionid
+              FROM {offlinequiz_group_questions}
+             WHERE offlinequizid = :offlinequizid
+               AND offlinegroupid = :offlinegroupid
+          ORDER BY slot ASC ";
+
+    $params = ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $groupid];
+    $questionids = $DB->get_fieldset_sql($sql, $params);
+
+    return $questionids;
+}
+/**
+ * get all quba entries of a given group
+ * @param mixed $offlinequiz
+ * @param mixed $groupid
+ * @return array|string
+ */
+function offlinequiz_get_group_questionbankentry_ids($offlinequiz, $groupid) {
+    global $DB;
+    if (!$groupid) {
+        $groupid = $offlinequiz->groupid;
+    }
+
+    // This query only makes sense if it is restricted to a offline group.
+    if (!$groupid) {
+        return '';
+    }
+
+    $sql = "SELECT qv.questionbankentryid
+              FROM {offlinequiz_group_questions} ogq
+              JOIN {question_versions} qv ON qv.questionid = ogq.questionid
+             WHERE offlinequizid = :offlinequizid
+               AND offlinegroupid = :offlinegroupid
+          ORDER BY slot ASC ";
+
+    $params = ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $groupid];
+    $questionbankentryids = $DB->get_fieldset_sql($sql, $params);
+
+    return $questionbankentryids;
+}
+
+
+/**
+ *
+ * @param mixed $offlinequiz The offlinequiz
+ * @return array returns an array of offline group numbers
+ */
+function offlinequiz_get_empty_groups($offlinequiz) {
+    global $DB;
+
+    $emptygroups = [];
+
+    if (
+        $groups = $DB->get_records(
+            'offlinequiz_groups',
+            ['offlinequizid' => $offlinequiz->id],
+            'groupnumber',
+            '*',
+            0,
+            $offlinequiz->numgroups
+        )
+    ) {
+        foreach ($groups as $group) {
+            $questions = offlinequiz_get_group_question_ids($offlinequiz, $group->id);
+            if (count($questions) < 1) {
+                $emptygroups[] = $group->groupnumber;
+            }
+        }
+    }
+    return $emptygroups;
+}
+
+
+/**
+ * Get the slot for a question with a particular id.
+ * @param object $offlinequiz the offlinequiz settings.
+ * @param stdClass $group
+ * @param int $questionid the of a question in the offlinequiz.
+ * @return mixed the corresponding slot. Null if the question is not in the offlinequiz.
+ */
+function offlinequiz_get_slot_for_question($offlinequiz, $group, $questionid) {
+    $questionids = offlinequiz_get_group_question_ids($offlinequiz, $group->id);
+    foreach ($questionids as $key => $id) {
+        if ($id == $questionid) {
+            return $key + 1;
+        }
+    }
+    return null;
+}
+
+/**
+ * Verify that the question exists, and the user has permission to use it.
+ * Does not return. Throws an exception if the question cannot be used.
+ * @param int $questionid The id of the question.
+ */
+function offlinequiz_require_question_use($questionid) {
+    global $DB;
+    $question = $DB->get_record('question', ['id' => $questionid], '*', MUST_EXIST);
+    question_require_capability_on($question, 'use');
+}
+
+/**
+ * Add a question to a offlinequiz
+ *
+ * Adds a question to a offlinequiz by updating $offlinequiz as well as the
+ * offlinequiz and offlinequiz_slots tables. It also adds a page break if required.
+ * @param int $questionid The id of the question to be added
+ * @param object $offlinequiz The extended offlinequiz object as used by edit.php
+ *      This is updated by this function
+ * @param int $page Which page in offlinequiz to add the question on. If 0 (default),
+ *      add at the end
+ * @param float $maxmark The maximum mark to set for this question. (Optional,
+ *      defaults to question.defaultmark.
+ * @return bool false if the question was already in the offlinequiz
+ */
+function offlinequiz_add_offlinequiz_question($questionid, $offlinequiz, $page = 0, $maxmark = null) {
+    global $DB;
+
+    if (offlinequiz_has_scanned_pages($offlinequiz->id)) {
+        return false;
+    }
+
+    $slots = $DB->get_records(
+        'offlinequiz_group_questions',
+        ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $offlinequiz->groupid],
+        'slot',
+        'questionid, slot, page, id'
+    );
+    if (array_key_exists($questionid, $slots)) {
+        return false;
+    }
+
+    $trans = $DB->start_delegated_transaction();
+
+    $maxpage = 1;
+    $numonlastpage = 0;
+    foreach ($slots as $slot) {
+        if ($slot->page > $maxpage) {
+            $maxpage = $slot->page;
+            $numonlastpage = 1;
+        } else {
+            $numonlastpage += 1;
+        }
+    }
+
+    // Add the new question instance.
+    $slot = new stdClass();
+    $slot->offlinequizid = $offlinequiz->id;
+    $slot->offlinegroupid = $offlinequiz->groupid;
+    $slot->questionid = $questionid;
+
+    if ($maxmark !== null) {
+        $slot->maxmark = $maxmark;
+    } else {
+        $slot->maxmark = $DB->get_field('question', 'defaultmark', ['id' => $questionid]);
+    }
+
+    if (is_int($page) && $page >= 1) {
+        // Adding on a given page.
+        $lastslotbefore = 0;
+        foreach (array_reverse($slots) as $otherslot) {
+            if ($otherslot->page > $page) {
+                // Increase the slot number of the other slot.
+                $DB->set_field('offlinequiz_group_questions', 'slot', $otherslot->slot + 1, ['id' => $otherslot->id]);
+            } else {
+                $lastslotbefore = $otherslot->slot;
+                break;
+            }
+        }
+        $slot->slot = $lastslotbefore + 1;
+        $slot->page = min($page, $maxpage + 1);
+    } else {
+        $lastslot = end($slots);
+        if ($lastslot) {
+            $slot->slot = $lastslot->slot + 1;
+        } else {
+            $slot->slot = 1;
+        }
+        if ($offlinequiz->questionsperpage && $numonlastpage >= $offlinequiz->questionsperpage) {
+            $slot->page = $maxpage + 1;
+        } else {
+            $slot->page = $maxpage;
+        }
+    }
+
+    $slotid = $DB->insert_record('offlinequiz_group_questions', $slot);
+
+    // Update or insert record in question_reference table.
+    $sql = "SELECT DISTINCT qr.id, qr.itemid
+              FROM {question} q
+              JOIN {question_versions} qv ON q.id = qv.questionid
+              JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+              JOIN {question_references} qr ON qbe.id = qr.questionbankentryid AND qr.version = qv.version
+              JOIN {offlinequiz_group_questions} os ON os.id = qr.itemid
+             WHERE q.id = ?
+               AND os.id = ?
+               AND qr.component = ?
+               AND qr.questionarea = ?";
+    $qreferenceitem = $DB->get_record_sql($sql, [$questionid, $slotid, 'mod_offlinequiz', 'slot']);
+    $version = $DB->get_field('question_versions', 'version', ['questionid' => $questionid]);
+
+    if (!$qreferenceitem) {
+        // Create a new reference record for questions created already.
+        $questionreferences = new \StdClass();
+        $questionreferences->usingcontextid = context_module::instance($offlinequiz->cmid)->id;
+        $questionreferences->component = 'mod_offlinequiz';
+        $questionreferences->questionarea = 'slot';
+        $questionreferences->itemid = $slotid;
+        $questionreferences->questionbankentryid = get_question_bank_entry($questionid)->id;
+        $questionreferences->version = $version;
+        $DB->insert_record('question_references', $questionreferences);
+    } else if ($qreferenceitem->itemid === 0 || $qreferenceitem->itemid === null) {
+        $questionreferences = new \StdClass();
+        $questionreferences->id = $qreferenceitem->id;
+        $questionreferences->itemid = $slotid;
+        $questionreferences->version = $version;
+        $DB->update_record('question_references', $questionreferences);
+    } else {
+        // If the reference record exits for another quiz.
+        $questionreferences = new \StdClass();
+        $questionreferences->usingcontextid = context_module::instance($offlinequiz->cmid)->id;
+        $questionreferences->component = 'mod_offlinequiz';
+        $questionreferences->questionarea = 'slot';
+        $questionreferences->itemid = $slotid;
+        $questionreferences->questionbankentryid = get_question_bank_entry($questionid)->id;
+        $questionreferences->version = $version;
+        $DB->insert_record('question_references', $questionreferences);
+    }
+
+    $trans->allow_commit();
+    return true;
+}
+
+/**
+ * returns the maximum number of questions in a set of offline groups
+ *
+ * @param stdClass $offlinequiz
+ * @param array $groups
+ * @return int
+ */
+function offlinequiz_get_maxquestions($offlinequiz, $groups) {
+    global $DB;
+
+    $maxquestions = 0;
+    foreach ($groups as $group) {
+        $questionids = offlinequiz_get_group_question_ids($offlinequiz, $group->id);
+
+        [$qsql, $params] = $DB->get_in_or_equal($questionids, SQL_PARAMS_NAMED);
+
+        $numquestions = $DB->count_records_sql(
+            "SELECT COUNT(id) FROM {question} WHERE qtype <> 'description' AND id $qsql",
+            $params
+        );
+        if ($numquestions > $maxquestions) {
+            $maxquestions = $numquestions;
+        }
+    }
+    return $maxquestions;
+}
+
+/**
+ *
+ * @param stdClass $scannedpage
+ * @param array $corners
+ */
+function offlinequiz_save_page_corners($scannedpage, $corners) {
+    global $DB;
+
+    $position = 0;
+    if ($existingcorners = $DB->get_records('offlinequiz_page_corners', ['scannedpageid' => $scannedpage->id], 'position')) {
+        foreach ($existingcorners as $corner) {
+            $corner->x = $corners[$position]->x;
+            $corner->y = $corners[$position++]->y;
+            $DB->update_record('offlinequiz_page_corners', $corner);
+        }
+    } else {
+        foreach ($corners as $corner) {
+            unset($corner->blank);
+            $corner->position = $position++;
+            $corner->scannedpageid = $scannedpage->id;
+            $DB->insert_record('offlinequiz_page_corners', $corner);
+        }
+    }
+}
+
+/**
+ * returns the maximum number of answers in the group questions of an offlinequiz
+ * @param stdClass $offlinequiz
+ * @param array $groups
+ * @return number
+ */
+function offlinequiz_get_maxanswers($offlinequiz, $groups = []) {
+    global $CFG, $DB;
+
+    $groupids = [];
+    foreach ($groups as $group) {
+        $groupids[] = $group->id;
+    }
+
+    $sql = "SELECT DISTINCT(questionid)
+              FROM {offlinequiz_group_questions}
+             WHERE offlinequizid = :offlinequizid
+               AND questionid > 0";
+
+    if (!empty($groupids)) {
+        [$gsql, $params] = $DB->get_in_or_equal($groupids, SQL_PARAMS_NAMED);
+        $sql .= " AND offlinegroupid " . $gsql;
+    } else {
+        $params = [];
+    }
+
+    $params['offlinequizid'] = $offlinequiz->id;
+
+    $questionids = $DB->get_records_sql($sql, $params);
+    $questionlist = array_keys($questionids);
+
+    $counts = [];
+    if (!empty($questionlist)) {
+        foreach ($questionlist as $questionid) {
+            $sql = "SELECT COUNT(id)
+                      FROM {question_answers} qa
+                     WHERE qa.question = :questionid
+                    ";
+            $params = ['questionid' => $questionid];
+            $counts[] = $DB->count_records_sql($sql, $params);
+        }
+        return max($counts);
+    } else {
+        return 0;
+    }
+}
+
+
+/**
+ * Repaginate the questions in a offlinequiz
+ * @param int $offlinequizid the id of the offlinequiz to repaginate.
+ * @param int $offlinegroupid the id off the offlinequizgroup
+ * @param int $slotsperpage number of items to put on each page. 0 means unlimited.
+ */
+function offlinequiz_repaginate_questions($offlinequizid, $offlinegroupid, $slotsperpage) {
+    global $DB;
+    $trans = $DB->start_delegated_transaction();
+
+    $slots = $DB->get_records(
+        'offlinequiz_group_questions',
+        ['offlinequizid' => $offlinequizid, 'offlinegroupid' => $offlinegroupid],
+        'slot'
+    );
+
+    $currentpage = 1;
+    $slotsonthispage = 0;
+    foreach ($slots as $slot) {
+        if ($slotsonthispage && $slotsonthispage == $slotsperpage) {
+            $currentpage += 1;
+            $slotsonthispage = 0;
+        }
+        if ($slot->page != $currentpage) {
+            $DB->set_field(
+                'offlinequiz_group_questions',
+                'page',
+                $currentpage,
+                ['id' => $slot->id]
+            );
+        }
+        $slotsonthispage += 1;
+    }
+
+    $trans->allow_commit();
+}
+
+/**
+ * Shuffle question ids
+ * @param mixed $questionids
+ * @return array
+ */
+function offlinequiz_shuffle_questions($questionids) {
+    shuffle($questionids);
+    return $questionids;
+}
+
+/**
+ * returns true if there are scanned pages for an offline quiz.
+ * @param int $offlinequizid
+ */
+function offlinequiz_has_scanned_pages($offlinequizid) {
+    global $CFG, $DB;
+
+    $sql = "SELECT COUNT(id)
+              FROM {offlinequiz_scanned_pages}
+             WHERE offlinequizid = :offlinequizid";
+    $params = ['offlinequizid' => $offlinequizid];
+    return $DB->count_records_sql($sql, $params) > 0;
+}
+
+/**
+ * Delete scanned page for this context
+ * @param mixed $page
+ * @param mixed $context
+ * @return void
+ */
+function offlinequiz_delete_scanned_page($page, $context) {
+    global $DB;
+
+    $resultid = $page->resultid;
+    $fs = get_file_storage();
+
+    // Delete the scanned page.
+    $DB->delete_records('offlinequiz_scanned_pages', ['id' => $page->id]);
+    // Delete the choices made on the page.
+    $DB->delete_records('offlinequiz_choices', ['scannedpageid' => $page->id]);
+    // Delete the corner coordinates.
+    $DB->delete_records('offlinequiz_page_corners', ['scannedpageid' => $page->id]);
+
+    // If there is no scannedpage for the result anymore, we also delete the result.
+    if ($resultid && !$DB->get_records('offlinequiz_scanned_pages', ['resultid' => $resultid])) {
+        // Delete the result.
+        $DB->delete_records('offlinequiz_results', ['id' => $resultid]);
+    }
+
+    // JZ: also delete the image files associated with the deleted page.
+    if ($page->filename && $file = $fs->get_file($context->id, 'mod_offlinequiz', 'imagefiles', 0, '/', $page->filename)) {
+        $file->delete();
+    }
+    if (
+        $page->warningfilename &&
+        $file = $fs->get_file($context->id, 'mod_offlinequiz', 'imagefiles', 0, '/', $page->warningfilename)
+    ) {
+        $file->delete();
+    }
+}
+
+/**
+ * delete scanned p page
+ * @param mixed $page
+ * @param mixed $context
+ * @return void
+ */
+function offlinequiz_delete_scanned_p_page($page, $context) {
+    global $DB;
+
+    $fs = get_file_storage();
+
+    // Delete the scanned participants page.
+    $DB->delete_records('offlinequiz_scanned_p_pages', ['id' => $page->id]);
+    // Delete the choices made on the page.
+    $DB->delete_records('offlinequiz_p_choices', ['scannedppageid' => $page->id]);
+
+    // JZ: also delete the image files associated with the deleted page.
+    if ($page->filename && $file = $fs->get_file($context->id, 'mod_offlinequiz', 'imagefiles', 0, '/', $page->filename)) {
+        $file->delete();
+    }
+}
+
+/**
+ * returns the number of completed results for an offline quiz.
+ * @param int $offlinequizid
+ * @param int $courseid
+ * @param boolean $onlystudents
+ */
+function offlinequiz_completed_results($offlinequizid, $courseid, $onlystudents = false) {
+    global $CFG, $DB;
+
+    if ($onlystudents) {
+        $coursecontext = context_course::instance($courseid);
+        $contextids = $coursecontext->get_parent_context_ids(true);
+        [$csql, $params] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED);
+        $params['offlinequizid'] = $offlinequizid;
+
+        $select = "SELECT COUNT(DISTINCT(u.id)) as counter
+                     FROM {user} u
+                     JOIN {role_assignments} ra ON ra.userid = u.id
+                LEFT JOIN {offlinequiz_results} qa
+                           ON u.id = qa.userid
+                          AND qa.offlinequizid = :offlinequizid
+                          AND qa.status = 'complete'
+                    WHERE ra.contextid $csql
+                      AND qa.userid IS NOT NULL
+        ";
+
+        return $DB->count_records_sql($select, $params);
+    } else {
+        $params = ['offlinequizid' => $offlinequizid];
+        return $DB->count_records_select(
+            'offlinequiz_results',
+            "offlinequizid = :offlinequizid AND status = 'complete'",
+            $params,
+            'COUNT(id)'
+        );
+    }
+}
+
+/**
+ * Delete an offlinequiz result, including the questions_usage_by_activity corresponding to it.
+ *
+ * @param mixed $resultid an integer attempt id or an attempt object
+ *      (row of the offlinequiz_results table).
+ * @param context_module $context
+ */
+function offlinequiz_delete_result($resultid, $context) {
+    global $DB;
+
+    if ($result = $DB->get_record('offlinequiz_results', ['id' => $resultid])) {
+        // First delete the result itself.
+        $DB->delete_records('offlinequiz_results', ['id' => $result->id]);
+
+        // Now we delete all scanned pages that refer to the result.
+        $scannedpages = $DB->get_records_sql("
+                SELECT *
+                  FROM {offlinequiz_scanned_pages}
+                 WHERE resultid = :resultid", ['resultid' => $result->id]);
+
+        foreach ($scannedpages as $page) {
+            offlinequiz_delete_scanned_page($page, $context);
+        }
+
+        // Finally, delete the question usage that belongs to the result.
+        if ($result->usageid) {
+            question_engine::delete_questions_usage_by_activity($result->usageid);
+        }
+    }
+}
+
+/**
+ * Save new maxgrade to a question instance
+ *
+ * Saves changes to the question grades in the offlinequiz_group_questions table.
+ * The grades of the questions in the group template qubas are also updated.
+ * This function does not update 'sumgrades' in the offlinequiz table.
+ *
+ * @param stdClass $offlinequiz  The offlinequiz to update / add the instances for.
+ * @param int $contextid
+ * @param int $questionid  The id of the question
+ * @param int $grade    The maximal grade for the question
+ * @param int $newquestionid
+ */
+function offlinequiz_update_question_instance($offlinequiz, $contextid, $questionid, $grade = 1, $newquestionid = null) {
+    global $DB;
+    $transaction = $DB->start_delegated_transaction();
+    $DB->set_field(
+        'offlinequiz_group_questions',
+        'maxmark',
+        $grade,
+        ['offlinequizid' => $offlinequiz->id, 'questionid' => $questionid]
+    );
+    if ($newquestionid) {
+        $newquestionversion = $DB->get_field('question_versions', 'version', ['questionid' => $newquestionid]);
+
+        $groupquestions = $DB->get_records(
+            'offlinequiz_group_questions',
+            ['questionid' => $questionid, 'offlinequizid' => $offlinequiz->id],
+            'id'
+        );
+        $DB->set_field(
+            'offlinequiz_group_questions',
+            'questionid',
+            $newquestionid,
+            ['offlinequizid' => $offlinequiz->id, 'questionid' => $questionid]
+        );
+        if ($groupquestions && $newquestionversion) {
+            foreach ($groupquestions as $groupquestion) {
+                $DB->set_field(
+                    'question_references',
+                    'version',
+                    $newquestionversion,
+                    ['itemid' => $groupquestion->id, 'component' => 'mod_offlinequiz', 'usingcontextid' => $contextid]
+                );
+                if (!$groupquestion->documentquestionid && $offlinequiz->docscreated) {
+                    $DB->set_field(
+                        'offlinequiz_group_questions',
+                        'documentquestionid',
+                        $questionid,
+                        ['questionid' => $groupquestion->questionid, 'offlinequizid' => $offlinequiz->id]
+                    );
+                }
+            }
+        }
+    }
+
+    if ($offlinequiz->docscreated) {
+        $groups = $DB->get_records(
+            'offlinequiz_groups',
+            ['offlinequizid' => $offlinequiz->id],
+            'groupnumber'
+        );
+        // Now change the maxmark of the question instance in the template question usages of the offlinequiz groups.
+        foreach ($groups as $group) {
+            if ($group->templateusageid) {
+                $templateusage = question_engine::load_questions_usage_by_activity($group->templateusageid);
+                offlinequiz_update_quba($templateusage, $questionid, $newquestionid, $grade);
+            }
+        }
+
+        // Now do the same for the qubas of the results of the offline quiz.
+        if ($results = $DB->get_records('offlinequiz_results', ['offlinequizid' => $offlinequiz->id])) {
+            foreach ($results as $result) {
+                if ($result->usageid > 0) {
+                    $templateusage = question_engine::load_questions_usage_by_activity($result->usageid);
+                    $templateusage = offlinequiz_update_quba($templateusage, $questionid, $newquestionid, $grade);
+                }
+            }
+        }
+        $DB->delete_records('offlinequiz_statistics', ['offlinequizid' => $offlinequiz->id]);
+        offlinequiz_update_grades($offlinequiz);
+    } else {
+        offlinequiz_delete_template_usages($offlinequiz);
+    }
+    $DB->commit_delegated_transaction($transaction);
+}
+
+/**
+ * update quba in database
+ * @param question_usage_by_activity $templateusage
+ * @param mixed $oldquestionid
+ * @param mixed $newquestionid
+ * @param mixed $grade
+ * @return question_usage_by_activity
+ */
+function offlinequiz_update_quba(question_usage_by_activity $templateusage, $oldquestionid, $newquestionid, $grade) {
+    global $DB;
+    $slots = $templateusage->get_slots();
+    $slot = 0;
+    foreach ($slots as $thisslot) {
+        if ($templateusage->get_question($thisslot)->id == $oldquestionid) {
+            $slot = $thisslot;
+            break;
+        }
+    }
+    if ($slot) {
+        if ($newquestionid) {
+            $oldquestionanswers = $DB->get_records('question_answers', ['question' => $oldquestionid]);
+            $newquestionanswers = array_values($DB->get_records('question_answers', ['question' => $newquestionid]));
+            $sql = "SELECT qasd.id AS id, qasd.value AS value
+                    FROM {question_attempt_step_data} qasd
+                    JOIN {question_attempt_steps} qas ON qas.id = qasd.attemptstepid
+                    JOIN {question_attempts} qa ON qa.id = qas.questionattemptid
+                    WHERE qa.questionusageid = :qubaid
+                    AND qa.questionid = :questionid
+                    AND qasd.name = '_order'";
+            $value = $DB->get_record_sql($sql, ['qubaid' => $templateusage->get_id(), 'questionid' => $oldquestionid]);
+            $values = explode(',', $value->value);
+            $replace = [];
+            $i = 0;
+            foreach ($oldquestionanswers as $oldquestionanswer) {
+                $replace[$oldquestionanswer->id] = $newquestionanswers[$i]->id;
+                $i++;
+            }
+            for ($i = 0; $i < count($values); $i++) {
+                $values[$i] = $replace[$values[$i]];
+            }
+            $values = implode(',', $values);
+            $DB->set_field('question_attempt_step_data', 'value', $values, ['id' => $value->id]);
+            $DB->set_field(
+                'question_attempts',
+                'questionid',
+                $newquestionid,
+                ['questionid' => $oldquestionid, 'questionusageid' => $templateusage->get_id()]
+            );
+            // Update the grade in the template usage.
+            $templateusage = question_engine::load_questions_usage_by_activity($templateusage->get_id());
+        }
+        question_engine::set_max_mark_in_attempts(new qubaid_list([$templateusage->get_id()]), $slot, $grade);
+        $templateusage->regrade_question($slot, true, $grade);
+        question_engine::save_questions_usage_by_activity($templateusage);
+        $templateusage = question_engine::load_questions_usage_by_activity($templateusage->get_id());
+        $totalmark = $templateusage->get_total_mark();
+        $DB->set_field('offlinequiz_results', 'sumgrades', $totalmark, ['usageid' => $templateusage->get_id()]);
+    }
+    $templateusage = question_engine::load_questions_usage_by_activity($templateusage->get_id());
+    return $templateusage;
+}
+
+/**
+ * Update the sumgrades field of the results in an offline quiz.
+ *
+ * @param object $offlinequiz The offlinequiz.
+ */
+function offlinequiz_update_all_attempt_sumgrades($offlinequiz) {
+    global $DB;
+    $dm = new question_engine_data_mapper();
+    $timenow = time();
+
+    $sql = "UPDATE {offlinequiz_results}
+               SET timemodified = :timenow,
+                   sumgrades = (
+                                {$dm->sum_usage_marks_subquery('usageid')}
+                               )
+             WHERE offlinequizid = :offlinequizid
+               AND timefinish <> 0";
+    $DB->execute($sql, ['timenow' => $timenow, 'offlinequizid' => $offlinequiz->id]);
+}
+
+/**
+ * The offlinequiz grade is the maximum that student's results are marked out of. When it
+ * changes, the corresponding data in offlinequiz_grades and offlinequiz_feedback needs to be
+ * rescaled. After calling this function, you probably need to call
+ * offlinequiz_update_all_attempt_sumgrades, offlinequiz_update_all_final_grades and
+ * offlinequiz_update_grades.
+ *
+ * @param float $newgrade the new maximum grade for the offlinequiz.
+ * @param object $offlinequiz the offlinequiz we are updating. Passed by reference so its
+ *      grade field can be updated too.
+ * @return bool indicating success or failure.
+ */
+function offlinequiz_set_grade($newgrade, $offlinequiz) {
+    global $DB;
+    // This is potentially expensive, so only do it if necessary.
+    if (abs($offlinequiz->grade - $newgrade) < 1e-7) {
+        // Nothing to do.
+        return true;
+    }
+
+    // Use a transaction, so that on those databases that support it, this is safer.
+    $transaction = $DB->start_delegated_transaction();
+
+    // Update the offlinequiz table.
+    $DB->set_field('offlinequiz', 'grade', $newgrade, ['id' => $offlinequiz->id]);
+
+    $offlinequiz->grade = $newgrade;
+
+    // Update grade item and send all grades to gradebook.
+    offlinequiz_grade_item_update($offlinequiz);
+    offlinequiz_update_grades($offlinequiz);
+
+    $transaction->allow_commit();
+    return true;
+}
+
+
+/**
+ * Returns info about the JS module used by offlinequizzes.
+ *
+ * @return array
+ */
+function offlinequiz_get_js_module() {
+    global $PAGE;
+    return [
+            'name' => 'mod_offlinequiz',
+            'fullpath' => '/mod/offlinequiz/module.js',
+            'requires' => ['base', 'dom', 'event-delegate', 'event-key',
+                    'core_question_engine'],
+            'strings' => [
+                    ['timesup', 'offlinequiz'],
+                    ['functiondisabledbysecuremode', 'offlinequiz'],
+                    ['flagged', 'question'],
+            ],
+    ];
+}
+
+// Other offlinequiz functions.
+
+/**
+ * get the action icons of a question
+ * @param object $offlinequiz the offlinequiz.
+ * @param int $cmid the course_module object for this offlinequiz.
+ * @param object $question the question.
+ * @param string $returnurl url to return to after action is done.
+ * @return string html for a number of icons linked to action pages for a
+ * question - preview and edit / view icons depending on user capabilities.
+ */
+function offlinequiz_question_action_icons($offlinequiz, $cmid, $question, $returnurl) {
+    $html = offlinequiz_question_preview_button($offlinequiz, $question);
+    if (!$offlinequiz->docscreated) {
+        $html .= ' ' .  offlinequiz_question_edit_button($cmid, $question, $returnurl);
+    }
+    return $html;
+}
+
+
+/**
+ * Returns true if the student has access to results. Function doesn't check if there is a result.
+ *
+ * @param stdClass $offlinequiz  The offlinequiz object
+ */
+function offlinequiz_results_open($offlinequiz) {
+
+    if ($offlinequiz->timeclose && time() >= $offlinequiz->timeclose) {
+        return false;
+    }
+    if ($offlinequiz->timeopen && time() <= $offlinequiz->timeopen) {
+        return false;
+    }
+
+    $options = mod_offlinequiz_display_options::make_from_offlinequiz($offlinequiz);
+    // There has to be responses or (graded)sheetfeedback.
+
+    if (
+        $options->attempt == question_display_options::HIDDEN &&
+            $options->marks == question_display_options::HIDDEN &&
+            $options->sheetfeedback == question_display_options::HIDDEN &&
+            $options->gradedsheetfeedback == question_display_options::HIDDEN
+    ) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
+ * @deprecated User identification is now set in admin settings.
+ */
+function offlinequiz_load_useridentification() {
+    return;
+}
+
+/**
+ * Creates an array of maximum grades for an offlinequiz
+ *
+ * The grades are extracted for the offlinequiz_question_instances table.
+ * @param object $offlinequiz The offlinequiz settings.
+ * @return array of grades indexed by question id. These are the maximum
+ *      possible grades that students can achieve for each of the questions.
+ */
+function offlinequiz_get_all_question_grades($offlinequiz) {
+    global $CFG, $DB;
+
+    $questionlist = $offlinequiz->questions;
+    if (empty($questionlist)) {
+        return [];
+    }
+
+    $wheresql = '';
+    $params = [];
+    if (!empty($questionlist)) {
+        [$usql, $questionparams] = $DB->get_in_or_equal($questionlist, SQL_PARAMS_NAMED, 'qid');
+        $wheresql = " AND questionid $usql ";
+        $params = array_merge($params, $questionparams);
+    }
+    $params['offlinequizid'] = $offlinequiz->id;
+
+    $instances = $DB->get_records_sql("
+            SELECT questionid, maxmark
+              FROM {offlinequiz_group_questions}
+             WHERE offlinequizid = :offlinequizid
+                   $wheresql", $params);
+
+    $grades = [];
+    foreach ($questionlist as $qid) {
+        if (isset($instances[$qid])) {
+            $grades[$qid] = $instances[$qid]->maxmark;
+        } else {
+            $grades[$qid] = 1;
+        }
+    }
+
+    return $grades;
+}
+
+
+/**
+ * Returns the number of pages in a offlinequiz layout
+ *
+ * @param string $layout The string representing the offlinequiz layout. Always ends in ,0
+ * @return int The number of pages in the offlinequiz.
+ */
+function offlinequiz_number_of_pages($layout) {
+    return substr_count(',' . $layout, ',0');
+}
+
+/**
+ * Counts the multichoice question in a questionusage.
+ *
+ * @param question_usage_by_activity $questionusage
+ * @return number
+ */
+function offlinequiz_count_multichoice_questions(question_usage_by_activity $questionusage) {
+    $count = 0;
+    $slots = $questionusage->get_slots();
+    foreach ($slots as $slot) {
+        $question = $questionusage->get_question($slot);
+        if ($question->qtype->name() == 'multichoice' || $question->qtype->name() == 'multichoiceset') {
+            $count++;
+        }
+    }
+    return $count;
+}
+
+/**
+ * Returns the sumgrades for a given offlinequiz group.
+ *
+ * @param object $offlinequiz object that must contain the groupid field.
+ * @return mixed
+ */
+function offlinequiz_get_group_sumgrades($offlinequiz) {
+    global $DB;
+
+    $sql = 'SELECT COALESCE((SELECT SUM(maxmark)
+              FROM {offlinequiz_group_questions} ogq
+             WHERE ogq.offlinequizid = :offlinequizid
+               AND ogq.offlinegroupid = :groupid) , 0)';
+
+    $params = ['offlinequizid' => $offlinequiz->id,
+            'groupid' => $offlinequiz->groupid];
+
+    $sumgrades = $DB->get_field_sql($sql, $params);
+    return $sumgrades;
+}
+
+/**
+ * Update the sumgrades field of the offlinequiz. This needs to be called whenever
+ * the grading structure of the offlinequiz is changed. For example if a question is
+ * added or removed, or a question weight is changed.
+ *
+ * @param object $offlinequiz a offlinequiz.
+ * @param int $offlinegroupid
+ */
+function offlinequiz_update_sumgrades($offlinequiz, $offlinegroupid = null) {
+    global $DB;
+
+    $groupid = 0;
+    if (isset($offlinequiz->groupid)) {
+        $groupid = $offlinequiz->groupid;
+    }
+    if (!empty($offlinegroupid)) {
+        $groupid = $offlinegroupid;
+    }
+    $sql = 'UPDATE {offlinequiz_groups}
+               SET sumgrades = COALESCE((
+                   SELECT SUM(maxmark)
+                     FROM {offlinequiz_group_questions} ogq
+                    WHERE ogq.offlinequizid = :offlinequizid1
+                      AND ogq.offlinegroupid = :groupid1
+                      ), 0)
+             WHERE offlinequizid = :offlinequizid2
+               AND id = :groupid2';
+
+    $params = ['offlinequizid1' => $offlinequiz->id,
+            'offlinequizid2' => $offlinequiz->id,
+            'groupid1' => $groupid,
+            'groupid2' => $groupid];
+    $DB->execute($sql, $params);
+
+    $sumgrades = $DB->get_field('offlinequiz_groups', 'sumgrades', ['id' => $groupid]);
+    return $sumgrades;
+}
+
+/**
+ * Convert the raw grade stored in $attempt into a grade out of the maximum
+ * grade for this offlinequiz.
+ *
+ * @param float $rawgrade the unadjusted grade, fof example $attempt->sumgrades
+ * @param object $offlinequiz the offlinequiz object. Only the fields grade, sumgrades and decimalpoints are used.
+ * @param stdClass $group
+ * @param bool|string $format whether to format the results for display
+ *      or 'question' to format a question grade (different number of decimal places.
+ * @return float|string the rescaled grade, or null/the lang string 'notyetgraded'
+ *      if the $grade is null.
+ */
+function offlinequiz_rescale_grade($rawgrade, $offlinequiz, $group, $format = true) {
+    if (is_null($rawgrade)) {
+        $grade = null;
+    } else if ($group->sumgrades >= 0.000005) {
+        $grade = $rawgrade / $group->sumgrades * $offlinequiz->grade;
+    } else {
+        $grade = 0;
+    }
+    if ($format === 'question') {
+        $grade = offlinequiz_format_question_grade($offlinequiz, $grade);
+    } else if ($format) {
+        $grade = offlinequiz_format_grade($offlinequiz, $grade);
+    }
+    return $grade;
+}
+
+
+/**
+ * Extends first object with member data of the second
+ *
+ * @param array $first
+ * @param array $second
+ */
+function offlinequiz_extend_object(&$first, &$second) {
+
+    foreach ($second as $key => $value) {
+        if (empty($first->$key)) {
+            $first->$key = $value;
+        }
+    }
+}
+
+/**
+ * Returns the group object for a given offlinequiz and group number (1,2,3...). Adds a
+ * new group if the group does not exist.
+ *
+ * @param stdClass $offlinequiz
+ * @param int $groupnumber
+ * @return mixed
+ */
+function offlinequiz_get_group($offlinequiz, $groupnumber) {
+    global $DB;
+
+    if (
+        !$offlinequizgroup = $DB->get_record(
+            'offlinequiz_groups',
+            ['offlinequizid' => $offlinequiz->id, 'groupnumber' => $groupnumber]
+        )
+    ) {
+        if ($groupnumber > 0 && $groupnumber <= $offlinequiz->numgroups) {
+            $offlinequizgroup = offlinequiz_add_group($offlinequiz->id, $groupnumber);
+        }
+    }
+    return $offlinequizgroup;
+}
+
+/**
+ * Adds a new group with a given group number to a given offlinequiz.
+ *
+ * @param int $offlinequizid the data that came from the form.
+ * @param int $groupnumber The number of the group to add.
+ * @return mixed the id of the new instance on success,
+ *          false or a string error message on failure.
+ */
+function offlinequiz_add_group($offlinequizid, $groupnumber) {
+    global $DB;
+
+    $offlinequizgroup = new StdClass();
+    $offlinequizgroup->offlinequizid = $offlinequizid;
+    $offlinequizgroup->groupnumber = $groupnumber;
+
+    // Note: numberofpages and templateusageid will be filled later.
+
+    // Try to store it in the database.
+    if (!$offlinequizgroup->id = $DB->insert_record('offlinequiz_groups', $offlinequizgroup)) {
+        return false;
+    }
+
+    return $offlinequizgroup;
+}
+
+/**
+ * Checks whether any list of participants have been created for a given offlinequiz.
+ *
+ * @param object $offlinequiz
+ * @return boolean
+ */
+function offlinequiz_partlist_created($offlinequiz) {
+    global $DB;
+
+    return $DB->count_records('offlinequiz_p_lists', ['offlinequizid' => $offlinequiz->id]) > 0;
+}
+
+
+/**
+ * An extension of question_display_options that includes the extra options used
+ * by the offlinequiz.
+ *
+ * @copyright     2015 Academic Moodle Cooperation {@link http://www.academic-moodle-cooperation.org}
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class mod_offlinequiz_display_options extends question_display_options {
+    /**
+     * @var bool if this is false, then the student is not allowed to review
+     * anything about the result.
+     */
+    public $responses = true;
+
+    /**
+     * @var bool if this is false, then the student cannot see the scanned answer forms
+     */
+    public $sheetfeedback = false;
+
+    /**
+     * @var bool if this is false, then the student cannot see any markings in the scanned answer forms.
+     */
+    public $gradedsheetfeedback = false;
+
+    /**
+     * @var bool if this is false, the student is not allowed to see the attempt
+     */
+    public $attempt;
+
+    /**
+     * Set up the various options from the offlinequiz settings, and a time constant.
+     * @param stdClass $offlinequiz the offlinequiz settings.
+     * @return mod_offlinequiz_display_options set up appropriately.
+     */
+    public static function make_from_offlinequiz($offlinequiz) {
+        $options = new self();
+
+        $options->attempt = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_ATTEMPT);
+        $options->marks = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_MARKS)
+                          ? question_display_options::MARK_AND_MAX : question_display_options::HIDDEN;
+        $options->correctness = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_CORRECTNESS);
+        $options->feedback = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_SPECIFICFEEDBACK);
+        $options->generalfeedback = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_GENERALFEEDBACK);
+        $options->rightanswer = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_RIGHTANSWER);
+        $options->sheetfeedback = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_SHEET);
+        $options->gradedsheetfeedback = self::extract($offlinequiz->review, OFFLINEQUIZ_REVIEW_GRADEDSHEET);
+
+        $options->numpartscorrect = $options->feedback;
+
+        if (property_exists($offlinequiz, 'decimalpoints')) {
+            $options->markdp = $offlinequiz->decimalpoints;
+        }
+
+        // We never want to see any flags.
+        $options->flags = question_display_options::HIDDEN;
+
+        return $options;
+    }
+
+    /**
+     * extract
+     * @param mixed $bitmask
+     * @param mixed $bit
+     * @param mixed $whenset
+     * @param mixed $whennotset
+     */
+    protected static function extract($bitmask, $bit, $whenset = self::VISIBLE, $whennotset = self::HIDDEN) {
+        if ($bitmask & $bit) {
+            return $whenset;
+        } else {
+            return $whennotset;
+        }
+    }
+}
+
+
+/**
+ * The appropriate mod_offlinequiz_display_options object for this result at this
+ * offlinequiz right now.
+ *
+ * @param object $offlinequiz the offlinequiz instance.
+ * @param object $result the result in question.
+ * @param context_module $context the offlinequiz context.
+ *
+ * @return mod_offlinequiz_display_options
+ */
+function offlinequiz_get_review_options($offlinequiz, $result, $context) {
+
+    $options = mod_offlinequiz_display_options::make_from_offlinequiz($offlinequiz);
+
+    $options->readonly = true;
+
+    if (!empty($result->id)) {
+        $options->questionreviewlink = new moodle_url(
+            '/mod/offlinequiz/reviewquestion.php',
+            ['resultid' => $result->id]
+        );
+    }
+
+    if (
+        !is_null($context) &&
+            has_capability('mod/offlinequiz:viewreports', $context) &&
+            has_capability('moodle/grade:viewhidden', $context)
+    ) {
+        // The teacher should be shown everything.
+        $options->attempt = question_display_options::VISIBLE;
+        $options->marks = question_display_options::MARK_AND_MAX;
+        $options->correctness = question_display_options::VISIBLE;
+        $options->feedback = question_display_options::VISIBLE;
+        $options->rightanswer = question_display_options::VISIBLE;
+        $options->generalfeedback = question_display_options::VISIBLE;
+        $options->sheetfeedback = question_display_options::VISIBLE;
+        $options->gradedsheetfeedback = question_display_options::VISIBLE;
+
+        // Show a link to the comment box only for closed attempts.
+        if (
+            !empty($result->id) && $result->timefinish &&
+                !is_null($context) && has_capability('mod/offlinequiz:grade', $context)
+        ) {
+            $options->manualcomment = question_display_options::VISIBLE;
+            $options->manualcommentlink = new moodle_url(
+                '/mod/offlinequiz/comment.php',
+                ['resultid' => $result->id]
+            );
+        }
+    }
+    return $options;
+}
+
+
+/**
+ * Combines the review options from a number of different offlinequiz attempts.
+ * Returns an array of two ojects, so the suggested way of calling this
+ * funciton is:
+ * list($someoptions, $alloptions) = offlinequiz_get_combined_reviewoptions(...)
+ *
+ * @param stdClass $offlinequiz the offlinequiz instance.
+ *
+ * @return array of two options objects, one showing which options are true for
+ *          at least one of the attempts, the other showing which options are true
+ *          for all attempts.
+ */
+function offlinequiz_get_combined_reviewoptions($offlinequiz) {
+    $fields = ['feedback', 'generalfeedback', 'rightanswer'];
+    $someoptions = new stdClass();
+    $alloptions = new stdClass();
+    foreach ($fields as $field) {
+        $someoptions->$field = false;
+        $alloptions->$field = true;
+    }
+    $someoptions->marks = question_display_options::HIDDEN;
+    $alloptions->marks = question_display_options::MARK_AND_MAX;
+
+    $attemptoptions = mod_offlinequiz_display_options::make_from_offlinequiz($offlinequiz);
+    foreach ($fields as $field) {
+        $someoptions->$field = $someoptions->$field || $attemptoptions->$field;
+        $alloptions->$field = $alloptions->$field && $attemptoptions->$field;
+    }
+    $someoptions->marks = max($someoptions->marks, $attemptoptions->marks);
+    $alloptions->marks = min($alloptions->marks, $attemptoptions->marks);
+
+    return [$someoptions, $alloptions];
+}
+
+/**
+ * Creates HTML code for a question edit button, used by editlib.php
+ *
+ * @param int $cmid the course_module.id for this offlinequiz.
+ * @param object $question the question.
+ * @param string $returnurl url to return to after action is done.
+ * @param string $contentaftericon some HTML content to be added inside the link, after the icon.
+ * @return string the HTML for an edit icon, view icon, or nothing for a question
+ *      (depending on permissions).
+ */
+function offlinequiz_question_edit_button($cmid, $question, $returnurl, $contentaftericon = '') {
+    global $CFG, $OUTPUT;
+
+    // Minor efficiency saving. Only get strings once, even if there are a lot of icons on one page.
+    static $stredit = null;
+    static $strview = null;
+    if ($stredit === null) {
+        $stredit = get_string('edit');
+        $strview = get_string('view');
+    }
+
+    // What sort of icon should we show?
+    $action = '';
+    if (
+        !empty($question->id) &&
+            (question_has_capability_on($question, 'edit', $question->category) ||
+                    question_has_capability_on($question, 'move', $question->category))
+    ) {
+        $action = $stredit;
+        $icon = '/t/edit';
+    } else if (
+        !empty($question->id) &&
+            question_has_capability_on($question, 'view', $question->category)
+    ) {
+        $action = $strview;
+        $icon = '/i/info';
+    }
+
+    // Build the icon.
+    if ($action) {
+        if ($returnurl instanceof moodle_url) {
+            $returnurl = str_replace($CFG->wwwroot, '', $returnurl->out(false));
+        }
+        $questionparams = ['returnurl' => $returnurl, 'cmid' => $cmid, 'id' => $question->id];
+        $questionurl = new moodle_url("$CFG->wwwroot/question/question.php", $questionparams);
+        $iconhtml = $OUTPUT->pix_icon($icon, $action, 'core');
+        return html_writer::link($questionurl, $iconhtml . $contentaftericon, ['title' => $action]);
+    } else {
+        return $contentaftericon;
+    }
+}
+/**
+ * Common setup for all pages for editing offlinequiz questions.
+ *
+ * @param string $edittab code for this edit tab
+ * @param string $baseurl the name of the script calling this funciton. For examle 'question/edit.php'.
+ */
+function offlinequiz_question_edit_setup($edittab, $baseurl) {
+    global $SESSION;
+    [$thispageurl, $contexts, $cmid, $cm, $module, $pagevars] = question_edit_setup($edittab, $baseurl);
+    $groupnumber = optional_param('groupnumber', 1, PARAM_INT);
+    if ($groupnumber === -1 && !empty($SESSION->question_pagevars['groupnumber'])) {
+        $groupnumber = $SESSION->question_pagevars['groupnumber'];
+    }
+
+    if ($groupnumber === -1) {
+        $groupnumber = 1;
+    }
+
+    $thispageurl->param('groupnumber', $groupnumber);
+    $pagevars['groupnumber'] = $groupnumber;
+    return [$thispageurl, $contexts, $cmid, $cm, $module, $pagevars];
+}
+
+/**
+ * Creates HTML code for a question preview button.
+ *
+ * @param object $offlinequiz the offlinequiz settings
+ * @param object $question the question
+ * @param bool $label if true, show the preview question label after the icon
+ * @return string the HTML for a preview question icon.
+ */
+function offlinequiz_question_preview_button($offlinequiz, $question, $label = false) {
+    global $CFG, $OUTPUT;
+    if (
+        property_exists($question, 'category') &&
+            !question_has_capability_on($question, 'use', $question->category)
+    ) {
+        return '';
+    }
+
+    $url = offlinequiz_question_preview_url($offlinequiz, $question);
+
+    // Do we want a label?
+    $strpreviewlabel = '';
+    if ($label) {
+        $strpreviewlabel = get_string('preview', 'offlinequiz');
+    }
+
+    // Build the icon.
+    $strpreviewquestion = get_string('previewquestion', 'offlinequiz');
+    $image = $OUTPUT->pix_icon('t/preview', $strpreviewquestion);
+
+    $action = new popup_action(
+        'click',
+        $url,
+        'questionpreview',
+        \qbank_previewquestion\helper::question_preview_popup_params()
+    );
+
+    return $OUTPUT->action_link($url, $image, $action, ['title' => $strpreviewquestion]);
+}
+
+/**
+ * get the preview url for the question
+ * @param object $offlinequiz the offlinequiz settings
+ * @param object $question the question
+ * @return moodle_url to preview this question with the options from this offlinequiz.
+ */
+function offlinequiz_question_preview_url($offlinequiz, $question) {
+    // Get the appropriate display options.
+    $displayoptions = mod_offlinequiz_display_options::make_from_offlinequiz($offlinequiz);
+
+    $maxmark = null;
+    if (isset($question->maxmark)) {
+        $maxmark = $question->maxmark;
+    }
+
+    // Work out the correct preview URL.
+    return \qbank_previewquestion\helper::question_preview_url(
+        $question->id,
+        null,
+        $maxmark,
+        $displayoptions
+    );
+}
+
+
+/**
+ * Retrieves a template question usage for an offline group. Creates a new template if there is none.
+ * While creating question usage it shuffles the group questions if shuffleanswers is created.
+ *
+ * @param object $offlinequiz
+ * @param object $group
+ * @param object $context
+ * @return question_usage_by_activity
+ */
+function offlinequiz_get_group_template_usage($offlinequiz, $group, $context) {
+    global $CFG, $DB;
+    if (!empty($group->templateusageid) && $group->templateusageid > 0) {
+        $templateusage = question_engine::load_questions_usage_by_activity($group->templateusageid);
+    } else {
+        $questionids = offlinequiz_get_group_question_ids($offlinequiz, $group->id);
+
+        if ($offlinequiz->shufflequestions) {
+            $offlinequiz->groupid = $group->id;
+
+            $questionids = offlinequiz_shuffle_questions($questionids);
+        }
+
+        // We have to use our own class s.t. we can use the clone function to create results.
+        $templateusage = offlinequiz_make_questions_usage_by_activity('mod_offlinequiz', $context);
+        $templateusage->set_preferred_behaviour('immediatefeedback');
+
+        if (!$questionids) {
+            throw new \moodle_exception(get_string('noquestionsfound', 'offlinequiz'), 'view.php?q=' . $offlinequiz->id);
+        }
+
+        // Gets database raw data for the questions.
+        $questiondata = question_load_questions($questionids);
+
+        // Get the question instances for initial markmarks.
+        $sql = "SELECT questionid, maxmark
+                  FROM {offlinequiz_group_questions}
+                 WHERE offlinequizid = :offlinequizid
+                   AND offlinegroupid = :offlinegroupid ";
+
+        $groupquestions = $DB->get_records_sql(
+            $sql,
+            ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $group->id]
+        );
+
+        foreach ($questionids as $questionid) {
+            if ($questionid) {
+                // Convert the raw data of multichoice questions to a real question definition object.
+                if (!$offlinequiz->shuffleanswers) {
+                    $questiondata[$questionid]->options->shuffleanswers = false;
+                }
+                $question = question_bank::make_question($questiondata[$questionid]);
+
+                // We only add multichoice questions which are needed for grading.
+                if ($question->get_type_name() == 'multichoice' || $question->get_type_name() == 'multichoiceset') {
+                    $templateusage->add_question($question, $groupquestions[$question->id]->maxmark);
+                }
+            }
+        }
+
+        // Create attempts for all questions (fixes order of the answers if shuffleanswers is active).
+        $templateusage->start_all_questions();
+
+        // Save the template question usage to the DB.
+        question_engine::save_questions_usage_by_activity($templateusage);
+
+        // Save the templateusage-ID in the offlinequiz_groups table.
+        $group->templateusageid = $templateusage->get_id();
+        $DB->set_field('offlinequiz_groups', 'templateusageid', $group->templateusageid, ['id' => $group->id]);
+    } // End else.
+    return $templateusage;
+}
+
+
+/**
+ * Deletes the PDF forms of an offlinequiz.
+ *
+ * @param object $offlinequiz
+ */
+function offlinequiz_delete_pdf_forms($offlinequiz) {
+    global $DB;
+
+    $fs = get_file_storage();
+
+    // If the offlinequiz has just been created then there is no cmid.
+    if (isset($offlinequiz->cmid)) {
+        $context = context_module::instance($offlinequiz->cmid);
+
+        // Delete PDF documents.
+        $files = $fs->get_area_files($context->id, 'mod_offlinequiz', 'pdfs');
+        foreach ($files as $file) {
+            $file->delete();
+        }
+    }
+    // Delete the file names in the offlinequiz groups.
+    $DB->set_field('offlinequiz_groups', 'questionfilename', null, ['offlinequizid' => $offlinequiz->id]);
+    $DB->set_field('offlinequiz_groups', 'answerfilename', null, ['offlinequizid' => $offlinequiz->id]);
+    $DB->set_field('offlinequiz_groups', 'correctionfilename', null, ['offlinequizid' => $offlinequiz->id]);
+    // Delete changed documentquestionids.
+    $DB->set_field('offlinequiz_group_questions', 'documentquestionid', null, ['offlinequizid' => $offlinequiz->id]);
+
+    // Set offlinequiz->docscreated to 0.
+    $offlinequiz->docscreated = 0;
+    $DB->set_field('offlinequiz', 'docscreated', 0, ['id' => $offlinequiz->id]);
+    return $offlinequiz;
+}
+
+/**
+ * Deletes the question usages by activity for an offlinequiz. This function must not be
+ * called if the offline quiz has attempts or scanned pages
+ *
+ * @param object $offlinequiz
+ * @param bool $deletefiles
+ */
+function offlinequiz_delete_template_usages($offlinequiz, $deletefiles = true) {
+    global $CFG, $DB, $OUTPUT;
+
+    if (
+        $groups = $DB->get_records(
+            'offlinequiz_groups',
+            ['offlinequizid' => $offlinequiz->id],
+            'groupnumber',
+            '*',
+            0,
+            $offlinequiz->numgroups
+        )
+    ) {
+        foreach ($groups as $group) {
+            if ($group->templateusageid) {
+                question_engine::delete_questions_usage_by_activity($group->templateusageid);
+                $group->templateusageid = 0;
+                $DB->set_field('offlinequiz_groups', 'templateusageid', 0, ['id' => $group->id]);
+            }
+        }
+    }
+
+    // Also delete the PDF forms if they have been created.
+    if ($deletefiles) {
+        return offlinequiz_delete_pdf_forms($offlinequiz);
+    } else {
+        return $offlinequiz;
+    }
+}
+
+/**
+ * returns the lang string of the id_field
+ */
+function offlinequiz_get_id_field_name() {
+    $offlinequizconfig = get_config('offlinequiz');
+    if (get_string_manager()->string_exists($offlinequizconfig->ID_field, 'core')) {
+        return get_string($offlinequizconfig->ID_field);
+    } else {
+        // Some table fields don't have a name (e.g. id). We have to make langstrings for them.
+        return get_string($offlinequizconfig->ID_field, 'offlinequiz');
+    }
+}
+/**
+ * get user by it's userkey
+ * @param mixed $offlinequiz
+ * @param mixed $userkey
+ */
+function offlinequiz_get_user_by_userkey($offlinequiz, $userkey) {
+    global $DB;
+    $offlinequizconfig = get_config('offlinequiz');
+    $idfield = $offlinequizconfig->ID_field;
+    $sql = "SELECT u.*
+              FROM {user} u
+              JOIN {user_enrolments} ue on ue.userid = u.id
+              JOIN {enrol} e on ue.enrolid = e.id
+             WHERE $idfield = :userkey
+               AND e.courseid = :courseid";
+    $users = $DB->get_records_sql($sql, ['userkey' => $userkey, 'courseid' => $offlinequiz->course]);
+    if ($users) {
+        return reset($users);
+    }
+}
+/**
+ * Prints a preview for a question in an offlinequiz to Stdout.
+ *
+ * @param object $question
+ * @param array $choiceorder
+ * @param int $number
+ * @param object $context
+ * @param object $page the Page object
+ */
+function offlinequiz_print_question_preview($question, $choiceorder, $number, $context, $page) {
+    global $CFG, $DB;
+
+    $letterstr = 'abcdefghijklmnopqrstuvwxyz';
+
+    echo '<div id="q' . $question->id . '" class="preview">
+            <div class="question">
+              <span class="number">';
+
+    if ($question->qtype != 'description') {
+        echo $number . ')&nbsp;&nbsp;';
+    }
+    echo '    </span>';
+
+    $text = question_rewrite_question_preview_urls(
+        $question->questiontext,
+        $question->id,
+        $question->contextid,
+        'question',
+        'questiontext',
+        $question->id,
+        $context->id,
+        'offlinequiz'
+    );
+
+    // Remove leading paragraph tags because the cause a line break after the question number.
+    $text = preg_replace('/<p\\b[^>]*>(.*)<\/p\\b[^>]*>/i', '$1', $text);
+
+    // Filter only for tex formulas.
+    $mathfilters = offlinequiz_get_math_filters($context, $page);
+    $text = offlinequiz_apply_filters($text, $mathfilters);
+
+    if ($question->qtype != 'description') {
+        foreach ($choiceorder as $key => $answer) {
+            $question->options->answers[$answer]->answer =
+                offlinequiz_apply_filters($question->options->answers[$answer]->answer, $mathfilters);
+        }
+    }
+    echo $text;
+    echo '  </div>';
+    if ($question->qtype != 'description') {
+        echo '  <div class="grade">';
+        echo '(' . get_string('marks', 'quiz') . ': ' . ($question->maxmark + 0) . ')';
+        echo '  </div>';
+
+        foreach ($choiceorder as $key => $answer) {
+            $answertext = $question->options->answers[$answer]->answer;
+            // Remove all HTML comments (typically from MS Office).
+            $answertext = preg_replace("/<!--.*?--\s*>/ms", "", $answertext);
+            // Remove all paragraph tags because they mess up the layout.
+            $answertext = preg_replace('/<p\\b[^>]*>(.*)<\/p\\b[^>]*>/i', '$1', $answertext);
+            // Rewrite image URLs.
+            $answertext = question_rewrite_question_preview_urls(
+                $answertext,
+                $question->id,
+                $question->contextid,
+                'question',
+                'answer',
+                $question->options->answers[$answer]->id,
+                $context->id,
+                'offlinequiz'
+            );
+
+            echo "<div class=\"answer\">$letterstr[$key])&nbsp;&nbsp;";
+            echo $answertext;
+            echo "</div>";
+        }
+    }
+    echo "</div>";
+}
+/**
+ * Returns the list of math filters which are used to filter the question text.
+ *
+ * @param object $context
+ * @param object $page
+ * @return array
+ */
+function offlinequiz_get_math_filters($context, $page = null) {
+    $filters = filter_get_active_in_context($context);
+    $mathfilters = [];
+
+    if (array_key_exists('mathjaxloader', $filters) && $page) {
+        $mathjaxfilter = new filter_mathjaxloader\text_filter($context, []);
+        $mathjaxfilter->setup($page, $context);
+        $mathfilters[] = $mathjaxfilter;
+    } else {
+        // Mathjax is not available, so we have to use the old filter.
+        $mathjaxfilter = new filter_tex\text_filter($context, []);
+        $mathfilters[] = $mathjaxfilter;
+    }
+
+    // Wiris support.
+    if (
+        array_key_exists('wiris', $filters)
+        && get_config('offlinequiz', 'wirismathfilter_enabled')
+    ) {
+        // Use a forged wiris filter to force the use of PHP rendering.
+        $wirisfilter = new mod_offlinequiz\output\wiris_filter($context, []);
+        $mathfilters[] = $wirisfilter;
+    }
+
+    return $mathfilters;
+}
+/**
+ * apply filters to a text
+ * @param mixed $text
+ * @param mixed $filters
+ */
+function offlinequiz_apply_filters($text, $filters) {
+    foreach ($filters as $filter) {
+        $text = $filter->filter($text);
+    }
+    return $text;
+}
+
+/**
+ * Prints a list of participants to Stdout.
+ *
+ * @param object $offlinequiz
+ * @param context $coursecontext
+ * @param context $systemcontext
+ */
+function offlinequiz_print_partlist($offlinequiz, &$coursecontext, &$systemcontext) {
+    global $CFG, $COURSE, $DB, $OUTPUT;
+    $offlinequizconfig = get_config('offlinequiz');
+
+    if (!$course = $DB->get_record('course', ['id' => $coursecontext->instanceid])) {
+        throw new \moodle_exception('invalid course');
+    }
+    $pagesize = optional_param('pagesize', NUMBERS_PER_PAGE, PARAM_INT);
+    $checkoption = optional_param('checkoption', 0, PARAM_INT);
+    $listid = optional_param('listid', '', PARAM_INT);
+    $lists = $DB->get_records_sql(
+        "
+            SELECT id, listnumber, name
+              FROM {offlinequiz_p_lists}
+             WHERE offlinequizid = :offlinequizid
+          ORDER BY listnumber ASC",
+        ['offlinequizid' => $offlinequiz->id]
+    );
+
+    // First get roleids for students from leagcy.
+    if (!$roles = get_roles_with_capability('mod/offlinequiz:attempt', CAP_ALLOW, $systemcontext)) {
+        throw new \moodle_exception("No roles with capability 'mod/offlinequiz:attempt' defined in system context");
+    }
+
+    $roleids = [];
+    foreach ($roles as $role) {
+        $roleids[] = $role->id;
+    }
+
+    [$csql, $cparams] = $DB->get_in_or_equal($coursecontext->get_parent_context_ids(true), SQL_PARAMS_NAMED, 'ctx');
+    [$rsql, $rparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
+    $params = array_merge($cparams, $rparams);
+
+    $sql = "SELECT p.id, p.userid, p.listid, u." . $offlinequizconfig->ID_field . ", u.firstname, u.lastname,
+                   u.alternatename, u.middlename, u.firstnamephonetic, u.lastnamephonetic, u.picture, p.checked
+              FROM {offlinequiz_participants} p,
+                   {offlinequiz_p_lists} pl,
+                   {user} u,
+                   {role_assignments} ra
+             WHERE p.listid = pl.id
+               AND p.userid = u.id
+               AND ra.userid=u.id
+               AND pl.offlinequizid = :offlinequizid
+               AND ra.contextid $csql
+               AND ra.roleid $rsql";
+
+    $params['offlinequizid'] = $offlinequiz->id;
+    if (!empty($listid)) {
+        $sql .= " AND p.listid = :listid";
+        $params['listid'] = $listid;
+    }
+
+    $countsql = "SELECT COUNT(*)
+                   FROM {offlinequiz_participants} p,
+                        {offlinequiz_p_lists} pl,
+                        {user} u
+                  WHERE p.listid = pl.id
+                    AND p.userid = u.id
+                    AND pl.offlinequizid = :offlinequizid";
+
+    $cparams = ['offlinequizid' => $offlinequiz->id];
+    if (!empty($listid)) {
+        $countsql .= " AND p.listid = :listid";
+        $cparams['listid'] = $listid;
+    }
+
+    require_once($CFG->libdir . '/tablelib.php');
+
+    $tableparams = ['q' => $offlinequiz->id,
+            'mode' => 'attendances',
+            'listid' => $listid,
+            'pagesize' => $pagesize,
+            'strreallydel' => ''];
+
+    $table = new partlist_table(
+        'mod-offlinequiz-participants',
+        'participants.php',
+        $tableparams
+    );
+
+    // Define table columns.
+    $tablecolumns = ['checkbox', 'picture', 'fullname', $offlinequizconfig->ID_field, 'listnumber', 'attempt', 'checked'];
+    $tableheaders = ['<input type="checkbox" name="toggle" class="select-all-checkbox"/>',
+            '', get_string('fullname'), offlinequiz_get_id_field_name(), get_string('participantslist', 'offlinequiz'),
+            get_string('attemptexists', 'offlinequiz'), get_string('present', 'offlinequiz')];
+
+    $table->define_columns($tablecolumns);
+    $table->define_headers($tableheaders);
+    $table->define_baseurl($CFG->wwwroot . '/mod/offlinequiz/participants.php?mode=attendances&amp;q=' .
+            $offlinequiz->id . '&amp;checkoption=' . $checkoption . '&amp;pagesize=' . $pagesize . '&amp;listid=' . $listid);
+
+    $table->sortable(true);
+    $table->no_sorting('attempt');
+    $table->no_sorting('checkbox');
+    if (!empty($listid)) {
+        $table->no_sorting('listid');
+    }
+    $table->set_attribute('cellpadding', '2');
+    $table->set_attribute('id', 'participants-table');
+    $table->set_attribute('class', 'generaltable generalbox');
+
+    // Start working -- this is necessary as soon as the niceties are over.
+    $table->setup();
+
+    // Add extra limits due to initials bar.
+    if (!empty($countsql)) {
+        $totalinitials = $DB->count_records_sql($countsql, $cparams);
+        // Add extra limits due to initials bar.
+        [$ttest, $tparams] = $table->get_sql_where();
+
+        if (!empty($ttest) && (empty($checkoption) || $checkoption == 0)) {
+            $sql .= ' AND ' . $ttest;
+            $params = array_merge($params, $tparams);
+
+            $countsql .= ' AND ' . $ttest;
+            $cparams = array_merge($cparams, $tparams);
+        }
+        $total  = $DB->count_records_sql($countsql, $cparams);
+    }
+
+    if ($sort = $table->get_sql_sort()) {
+        $sql .= ' ORDER BY ' . $sort;
+    } else {
+        $sql .= ' ORDER BY u.lastname, u.firstname';
+    }
+
+    $table->initialbars($totalinitials > 20);
+    // Special settings for checkoption: show all entries on one page.
+    if (!empty($checkoption) && $checkoption > 0) {
+        $pagesize = $total;
+        $table->pagesize($pagesize, $total);
+        $participants = $DB->get_records_sql($sql, $params);
+    } else {
+        $table->pagesize($pagesize, $total);
+        $participants = $DB->get_records_sql($sql, $params, $table->get_page_start(), $table->get_page_size());
+    }
+
+    $strreallydel  = addslashes(get_string('deletepartcheck', 'offlinequiz'));
+
+    $sql = "SELECT COUNT(*)
+              FROM {offlinequiz_results}
+             WHERE userid = :userid
+               AND offlinequizid = :offlinequizid
+               AND status = 'complete'";
+    $params = ['offlinequizid' => $offlinequiz->id];
+    if ($participants) {
+        foreach ($participants as $participant) {
+            $user = $DB->get_record('user', ['id' => $participant->userid]);
+            $picture = $OUTPUT->user_picture($user, ['courseid' => $coursecontext->instanceid]);
+
+            $userlink = '<a href="' . $CFG->wwwroot . '/user/view.php?id=' . $participant->userid .
+                '&amp;course=' . $coursecontext->instanceid . '">' . fullname($participant) . '</a>';
+            $params['userid'] = $participant->userid;
+            if ($DB->count_records_sql($sql, $params) > 0) {
+                $attempt = true;
+            } else {
+                $attempt = false;
+            }
+            $row = [
+                    '<input type="checkbox" name="participantid[]" value="' . $participant->userid
+                     . '"  class="select-multiple-checkbox"/>',
+                    $picture,
+                    $userlink,
+                    $participant->{$offlinequizconfig->ID_field},
+                    $lists[$participant->listid]->name,
+                    $attempt ? "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/tick.gif\" alt=\"" .
+                    get_string('attemptexists', 'offlinequiz') . "\">"
+                     : "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/cross.gif\" alt=\"" .
+                    get_string('noattemptexists', 'offlinequiz') . "\">",
+                    $participant->checked ? "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/tick.gif\" alt=\""
+                     . get_string('ischecked', 'offlinequiz') . "\">"
+                     : "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/cross.gif\" alt=\"" .
+                    get_string('isnotchecked', 'offlinequiz') . "\">",
+                    ];
+            switch ($checkoption) {
+                case '0':
+                    $table->add_data($row);
+                    break;
+                case '1':
+                    if (!$attempt && $participant->checked) {
+                        $table->add_data($row);
+                    }
+                    break;
+                case '2':
+                    if ($attempt && !$participant->checked) {
+                        $table->add_data($row);
+                    }
+                    break;
+            }
+        }
+    } else {
+        // Print table.
+        $table->print_initials_bar();
+    }
+    $table->finish_html();
+
+    // Print "Select all" etc.
+    echo '<center>';
+
+    if (!empty($participants)) {
+        echo '<form id="downloadoptions" action="participants.php" method="get">';
+        echo '<input type="hidden" name="q" value="' . $offlinequiz->id . '" />';
+        echo '<input type="hidden" name="mode" value="attendances" />';
+        echo '<input type="hidden" name="pagesize" value="' . $pagesize . '" />';
+        echo '<input type="hidden" name="listid" value="' . $listid . '" />';
+        echo '<table class="boxaligncenter"><tr><td>';
+        $options = [
+                'Excel' => get_string('excelformat', 'offlinequiz'),
+                'ODS' => get_string('odsformat', 'offlinequiz'),
+                'CSV' => get_string('csvformat', 'offlinequiz'),
+        ];
+        print_string('downloadresultsas', 'offlinequiz');
+        echo "</td><td>";
+        echo html_writer::select($options, 'download', '', false);
+        echo '<button type="submit" class="btn btn-primary" >' . get_string('go') . '</button>';
+        echo '<script type="text/javascript">\n<!--\n document.getElementById("noscriptmenuaction").style.display = "none";' .
+            "\n-->\n" . '</script>';
+        echo "</td>\n";
+        echo "<td>";
+        echo "</td>\n";
+        echo '</tr></table></form>';
+    }
+
+    // Print display options.
+    echo '<div class="controls">';
+    echo '<form id="options" action="participants.php" method="get">';
+    echo '<center>';
+    echo '<p>' . get_string('displayoptions', 'quiz') . ': </p>';
+    echo '<input type="hidden" name="q" value="' . $offlinequiz->id . '" />';
+    echo '<input type="hidden" name="mode" value="attendances" />';
+    echo '<input type="hidden" name="listid" value="' . $listid . '" />';
+    echo '<table id="participant-options" class="boxaligncenter">';
+    echo '<tr align="left">';
+    echo '<td><label for="pagesize">' . get_string('pagesizeparts', 'offlinequiz') . '</label></td>';
+    echo '<td><input type="text" id="pagesize" name="pagesize" size="3" value="' . $pagesize . '" /></td>';
+    echo '</tr>';
+    echo '<tr align="left">';
+    echo '<td colspan="2">';
+
+    $options = [0 => get_string('showallparts', 'offlinequiz', $total)];
+    if ($course->id != SITEID) {
+        $options[1] = get_string('showmissingattemptonly', 'offlinequiz');
+        $options[2] = get_string('showmissingcheckonly', 'offlinequiz');
+    }
+
+    echo html_writer::select($options, 'checkoption', $checkoption);
+    echo '</td></tr>';
+    echo '<tr><td colspan="2" align="center">';
+    echo '<button type="submit" class="btn btn-secondary" >' . get_string('go') . '</button>';
+    echo '</td></tr></table>';
+    echo '</center>';
+    echo '</form>';
+    echo '</div>';
+    echo "\n";
+}
+
+/**
+ * Serves a list of participants as a file.
+ *
+ * @param object $offlinequiz
+ * @param string $fileformat
+ * @param context_course $coursecontext
+ * @param context $systemcontext
+ */
+function offlinequiz_download_partlist($offlinequiz, $fileformat, &$coursecontext, &$systemcontext) {
+    global $CFG, $DB;
+
+    $offlinequizconfig = get_config('offlinequiz');
+
+    $filename = clean_filename(get_string('participants', 'offlinequiz') . $offlinequiz->id);
+
+    // First get roleids for students from leagcy.
+    if (!$roles = get_roles_with_capability('mod/offlinequiz:attempt', CAP_ALLOW, $systemcontext)) {
+        throw new \moodle_exception("No roles with capability 'mod/offlinequiz:attempt' defined in system context");
+    }
+
+    $roleids = [];
+    foreach ($roles as $role) {
+        $roleids[] = $role->id;
+    }
+
+    [$csql, $cparams] = $DB->get_in_or_equal($coursecontext->get_parent_context_ids(true), SQL_PARAMS_NAMED, 'ctx');
+    [$rsql, $rparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
+    $params = array_merge($cparams, $rparams);
+
+    $sql = "SELECT p.id, p.userid, p.listid, u." . $offlinequizconfig->ID_field . ", u.firstname, u.lastname,
+                   u.alternatename, u.middlename, u.firstnamephonetic, u.lastnamephonetic,
+                   u.picture, p.checked
+             FROM {offlinequiz_participants} p,
+                  {offlinequiz_p_lists} pl,
+                  {user} u,
+                  {role_assignments} ra
+            WHERE p.listid = pl.id
+              AND p.userid = u.id
+              AND ra.userid=u.id
+              AND pl.offlinequizid = :offlinequizid
+              AND ra.contextid $csql
+              AND ra.roleid $rsql";
+
+    $params['offlinequizid'] = $offlinequiz->id;
+
+    // Define table headers.
+    $tableheaders = [get_string('fullname'),
+                          offlinequiz_get_id_field_name(),
+                          get_string('participantslist', 'offlinequiz'),
+                          get_string('attemptexists', 'offlinequiz'),
+                          get_string('present', 'offlinequiz')];
+
+    if ($fileformat == 'ODS' || $fileformat == 'Excel') {
+        if ($fileformat == 'ODS') {
+            require_once("$CFG->libdir/odslib.class.php");
+
+            $filename .= ".ods";
+            // Creating a workbook.
+            $workbook = new MoodleODSWorkbook("-");
+        } else {
+            require_once("$CFG->libdir/excellib.class.php");
+
+            $filename .= ".xls";
+            // Creating a workbook.
+            $workbook = new MoodleExcelWorkbook("-");
+        }
+        // Sending HTTP headers.
+        $workbook->send($filename);
+        // Creating the first worksheet.
+
+        require(__DIR__ . '/sheetlib.php');
+        [$myxls, $formats] = offlinequiz_sheetlib_initialize_headers($workbook);
+
+        // Print worksheet headers.
+        $colnum = 0;
+        foreach ($tableheaders as $item) {
+            $myxls->write(0, $colnum, $item, $formats['formatbc']);
+            $colnum++;
+        }
+        $rownum = 1;
+    } else if ($fileformat == 'CSV') {
+        $filename .= ".csv";
+
+        header("Content-Type: application/download\n");
+        header("Content-Disposition: attachment; filename=\"$filename\"");
+        header("Expires: 0");
+        header("Cache-Control: must-revalidate,post-check=0,pre-check=0");
+        header("Pragma: public");
+
+        $headers = implode(", ", $tableheaders);
+
+        echo $headers . " \n";
+    }
+
+    $lists = $DB->get_records('offlinequiz_p_lists', ['offlinequizid' => $offlinequiz->id]);
+    $participants = $DB->get_records_sql($sql, $params);
+    if ($participants) {
+        foreach ($participants as $participant) {
+            $userid = $participant->userid;
+            $attempt = false;
+            $sql = "SELECT COUNT(*)
+                      FROM {offlinequiz_results}
+                     WHERE userid = :userid
+                       AND offlinequizid = :offlinequizid
+                       AND status = 'complete'";
+            if ($DB->count_records_sql($sql, ['userid' => $userid, 'offlinequizid' => $offlinequiz->id]) > 0) {
+                $attempt = true;
+            }
+            $row = [
+                    fullname($participant),
+                    $participant->{$offlinequizconfig->ID_field},
+                    $lists[$participant->listid]->name,
+                    $attempt ? get_string('yes') : get_string('no'),
+                    $participant->checked ? get_string('yes') : get_string('no'),
+                    ];
+            if ($fileformat == 'Excel' || $fileformat == 'ODS') {
+                $colnum = 0;
+                foreach ($row as $item) {
+                    $myxls->write($rownum, $colnum, $item, $formats['format']);
+                    $colnum++;
+                }
+                $rownum++;
+            } else if ($fileformat == 'CSV') {
+                $text = implode(", ", $row);
+                echo $text . "\n";
+            }
+        }
+    }
+
+    if ($fileformat == 'Excel' || $fileformat == 'ODS') {
+        $workbook->close();
+    }
+    exit;
+}
+
+/**
+ * Creates a textual representation of a question for display.
+ *
+ * @param object $question A question object from the database questions table
+ * @param bool $showicon If true, show the question's icon with the question. False by default.
+ * @param bool $showquestiontext If true (default), show question text after question name. If false, show only question name.
+ * @param bool $showidnumber
+ * @param bool $showtags
+ */
+function offlinequiz_question_tostring(
+    $question,
+    $showicon = false,
+    $showquestiontext = true,
+    $showidnumber = false,
+    $showtags = false
+) {
+    global $OUTPUT;
+    $result = '';
+
+    // Question name.
+    $name = shorten_text(format_string($question->name), 200);
+    if ($showicon) {
+        $name .= print_question_icon($question) . ' ' . $name;
+    }
+    $result .= html_writer::span($name, 'questionname');
+
+    // Question idnumber.
+    if ($showidnumber && $question->idnumber !== null && $question->idnumber !== '') {
+        $result .= ' ' . html_writer::span(
+            html_writer::span(get_string('idnumber', 'question'), 'accesshide') .
+            ' ' . s($question->idnumber),
+            'badge badge-primary'
+        );
+    }
+
+    // Question text.
+    if ($showquestiontext) {
+        $questiontext = question_utils::to_plain_text(
+            $question->questiontext,
+            $question->questiontextformat,
+            ['noclean' => true, 'para' => false, 'filter' => false]
+        );
+        $questiontext = shorten_text($questiontext, 50);
+        if ($questiontext) {
+            $result .= ' ' . html_writer::span(s($questiontext), 'questiontext');
+        }
+    }
+
+    // Question tags.
+    if (is_array($showtags)) {
+        $tags = $showtags;
+    } else if ($showtags) {
+        $tags = core_tag_tag::get_item_tags('core_question', 'question', $question->id);
+    } else {
+        $tags = [];
+    }
+    if ($tags) {
+        $result .= $OUTPUT->tag_list($tags, null, 'd-inline', 0, null, true);
+    }
+
+    return $result;
+}
+
+/**
+ * Add a question to a offlinequiz group
+ *
+ * Adds a question to a offlinequiz by updating $offlinequiz as well as the
+ * offlinequiz and offlinequiz_question_instances tables. It also adds a page break
+ * if required.
+ * @param array $questionids The id of the question to be added
+ * @param object $offlinequiz The extended offlinequiz object as used by edit.php
+ *      This is updated by this function
+ * @param object $offlinegroup
+ * @param int $fromofflinegroup
+ * @param array $maxmarks
+ * @return bool false if the question was already in the offlinequiz
+ */
+function offlinequiz_add_questionlist_to_group(
+    $questionids,
+    $offlinequiz,
+    $offlinegroup,
+    $fromofflinegroup = null,
+    $maxmarks = null
+) {
+    global $DB;
+
+    if (offlinequiz_has_scanned_pages($offlinequiz->id)) {
+        return false;
+    }
+
+    // Don't add the same question twice.
+    foreach ($questionids as $questionid) {
+        $slots = $DB->get_records(
+            'offlinequiz_group_questions',
+            ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $offlinegroup->id],
+            'slot',
+            'questionid, slot, page, id'
+        );
+
+        if (array_key_exists($questionid, $slots)) {
+            continue;
+        }
+
+        $trans = $DB->start_delegated_transaction();
+        // If the question is already in another group, take the maxmark of that.
+        $maxmark = null;
+        if (
+            $fromofflinegroup && $oldmaxmark = $DB->get_field(
+                'offlinequiz_group_questions',
+                'maxmark',
+                ['offlinequizid' => $offlinequiz->id,
+                'offlinegroupid' => $fromofflinegroup,
+                'questionid' => $questionid]
+            )
+        ) {
+            $maxmark = $oldmaxmark;
+        } else if ($maxmarks && array_key_exists($questionid, $maxmarks)) {
+            $maxmark = $maxmarks[$questionid];
+        }
+
+        $maxpage = 1;
+        $numonlastpage = 0;
+        foreach ($slots as $slot) {
+            if ($slot->page > $maxpage) {
+                $maxpage = $slot->page;
+                $numonlastpage = 1;
+            } else {
+                $numonlastpage += 1;
+            }
+        }
+
+        // Add the new question instance.
+        $slot = new stdClass();
+        $slot->offlinequizid = $offlinequiz->id;
+        $slot->offlinegroupid = $offlinegroup->id;
+        $slot->questionid = $questionid;
+
+        if ($maxmark !== null) {
+            $slot->maxmark = $maxmark;
+        } else {
+            $slot->maxmark = $DB->get_field('question', 'defaultmark', ['id' => $questionid]);
+        }
+
+        $lastslot = end($slots);
+        if ($lastslot) {
+            $slot->slot = $lastslot->slot + 1;
+        } else {
+            $slot->slot = 1;
+        }
+        $slot->page = 0;
+
+        if (!$slot->page) {
+            if ($offlinequiz->questionsperpage && $numonlastpage >= $offlinequiz->questionsperpage) {
+                $slot->page = $maxpage + 1;
+            } else {
+                $slot->page = $maxpage;
+            }
+        }
+        $newid = $DB->insert_record('offlinequiz_group_questions', $slot);
+
+        $sql = "SELECT DISTINCT qr.id, qr.itemid
+              FROM {question} q
+              JOIN {question_versions} qv ON q.id = qv.questionid
+              JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+              JOIN {question_references} qr ON qbe.id = qr.questionbankentryid AND qr.version = qv.version
+              JOIN {offlinequiz_group_questions} os ON os.id = qr.itemid
+             WHERE q.id = ?
+               AND os.id = ?
+               AND qr.component = ?
+               AND qr.questionarea = ?";
+        $qreferenceitem = $DB->get_record_sql($sql, [$questionid, $slot->slot, 'mod_offlinequiz', 'slot']);
+
+        if (!$qreferenceitem) {
+            // Create a new reference record for questions created already.
+            $questionreferences = new \StdClass();
+            $questionreferences->usingcontextid = \context_module::instance($offlinequiz->cmid)->id;
+            $questionreferences->component = 'mod_offlinequiz';
+            $questionreferences->questionarea = 'slot';
+            $questionreferences->itemid = $newid;
+            $questionreferences->questionbankentryid = get_question_bank_entry($questionid)->id;
+            $version = $DB->get_record('question_versions', ['questionid' => $questionid]);
+            $questionreferences->version = $version->version;
+            $DB->insert_record('question_references', $questionreferences);
+        }
+        $trans->allow_commit();
+    }
+    return false;
+}
+/**
+ * add random questions to the offlinequiz
+ * @param stdClass $quiz
+ * @param int $addonpage
+ * @param int $categoryid
+ * @param int $number
+ * @param int $groupid
+ * @param int $recurse
+ * @param int $preventsamequestion
+ * @return void
+ */
+function offlinequiz_add_random_questions(
+    stdClass $quiz,
+    int $addonpage,
+    int $categoryid,
+    int $number,
+    int $groupid,
+    int $recurse,
+    int $preventsamequestion
+): void {
+    global $DB;
+
+    $category = $DB->get_record('question_categories', ['id' => $categoryid]);
+    if (!$category) {
+        new \moodle_exception('invalidcategoryid');
+    }
+
+    $catcontext = \context::instance_by_id($category->contextid);
+    require_capability('moodle/question:useall', $catcontext);
+
+    if ($recurse) {
+        $categoryids = question_categorylist($category->id);
+    } else {
+        $categoryids = [$category->id];
+    }
+
+    [$qcsql, $qcparams] = $DB->get_in_or_equal($categoryids, SQL_PARAMS_NAMED, 'qc');
+
+    $sql = "SELECT q.id
+              FROM {question} q
+              JOIN {question_versions} qv ON qv.questionid = q.id
+              JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+             WHERE qbe.questioncategoryid $qcsql
+               AND q.parent = 0
+               AND qv.status = 'ready'
+               AND q.qtype IN ('multichoice', 'multichoiceset')
+               AND NOT EXISTS (SELECT 1
+                                 FROM {question_versions} qv2
+                                 WHERE qv2.questionbankentryid = qv.questionbankentryid
+                                   AND qv.version < qv2.version) ";
+
+    if (!$preventsamequestion) {
+        // Find all questions in the selected categories that are not in the offline group yet.
+        $sql .= "AND NOT EXISTS (SELECT 1
+                                   FROM {offlinequiz_group_questions} ogq
+                                   JOIN {question_versions} qv3 ON qv3.questionid = ogq.questionid
+                                  WHERE qv3.questionbankentryid = qv.questionbankentryid
+                                    AND ogq.offlinequizid = :offlinequizid
+                                    AND ogq.offlinegroupid = :offlinegroupid)";
+    } else {
+        // Find all questions in the selected categories that are not in the offline test yet.
+        $sql .= "AND NOT EXISTS (SELECT 1
+                                   FROM {offlinequiz_group_questions} ogq
+                                   JOIN {question_versions} qv3 ON qv3.questionid = ogq.questionid
+                                  WHERE qv3.questionbankentryid = qv.questionbankentryid
+                                    AND ogq.offlinequizid = :offlinequizid)";
+    }
+
+    $qcparams['offlinequizid'] = $quiz->id;
+    $qcparams['offlinegroupid'] = $groupid;
+
+    $questionids = $DB->get_fieldset_sql($sql, $qcparams);
+    shuffle($questionids);
+
+    $chosenids = [];
+    while (($questionid = array_shift($questionids)) && $number > 0) {
+        $chosenids[] = $questionid;
+        $number -= 1;
+    }
+
+    $maxmarks = [];
+    if ($chosenids) {
+        // Get the old maxmarks in case questions are already in other offlinequiz groups.
+        [$qsql, $params] = $DB->get_in_or_equal($chosenids, SQL_PARAMS_NAMED);
+
+        $sql = "SELECT id, questionid, maxmark
+                  FROM {offlinequiz_group_questions}
+                 WHERE offlinequizid = :offlinequizid
+                   AND questionid $qsql";
+        $params['offlinequizid'] = $quiz->id;
+
+        if ($slots = $DB->get_records_sql($sql, $params)) {
+            foreach ($slots as $slot) {
+                if (!array_key_exists($slot->questionid, $maxmarks)) {
+                    $maxmarks[$slot->questionid] = $slot->maxmark;
+                }
+            }
+        }
+    }
+
+    $offlinegroup = new stdClass();
+    $offlinegroup->id = $groupid;
+
+    offlinequiz_add_questionlist_to_group($chosenids, $quiz, $offlinegroup, null, $maxmarks);
+}
+
+/**
+ *
+ * @param stdClass $offlinequiz
+ * @param array $questionids
+ */
+function offlinequiz_remove_questionlist($offlinequiz, $questionids) {
+    global $DB;
+
+    // Go through the question IDs and remove them if they exist.
+    // We do a DB commit after each question ID to make things simpler.
+    foreach ($questionids as $questionid) {
+        // Retrieve the slots indexed by id.
+        $slots = $DB->get_records(
+            'offlinequiz_group_questions',
+            ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $offlinequiz->groupid],
+            'slot'
+        );
+
+        // Build an array with slots indexed by questionid and indexed by slot number.
+        $questionslots = [];
+        $slotsinorder = [];
+        foreach ($slots as $slot) {
+            $questionslots[$slot->questionid] = $slot;
+            $slotsinorder[$slot->slot] = $slot;
+        }
+
+        if (!array_key_exists($questionid, $questionslots)) {
+            continue;
+        }
+
+        $slot = $questionslots[$questionid];
+
+        $nextslot = null;
+        $prevslot = null;
+        if (array_key_exists($slot->slot + 1, $slotsinorder)) {
+            $nextslot = $slotsinorder[$slot->slot + 1];
+        }
+        if (array_key_exists($slot->slot - 1, $slotsinorder)) {
+            $prevslot = $slotsinorder[$slot->slot - 1];
+        }
+        $lastslot = end($slotsinorder);
+
+        $trans = $DB->start_delegated_transaction();
+
+        // Reduce the page numbers of the following slots if there is no previous slot
+        // or the page number of the previous slot is smaller than the page number of the current slot.
+        $removepage = false;
+        if ($nextslot && $nextslot->page > $slot->page) {
+            if (!$prevslot || $prevslot->page < $slot->page) {
+                $removepage = true;
+            }
+        }
+
+        // Delete the slot.
+        $DB->delete_records(
+            'offlinequiz_group_questions',
+            ['offlinequizid' => $offlinequiz->id, 'offlinegroupid' => $offlinequiz->groupid,
+            'id' => $slot->id]
+        );
+
+        // Reduce the slot number in the following slots if there are any.
+        // Also reduce the page number if necessary.
+        if ($nextslot) {
+            for ($curslotnr = $nextslot->slot; $curslotnr <= $lastslot->slot; $curslotnr++) {
+                if ($slotsinorder[$curslotnr]) {
+                    if ($removepage) {
+                        $slotsinorder[$curslotnr]->page = $slotsinorder[$curslotnr]->page - 1;
+                    }
+                    // Reduce the slot number by one.
+                    $slotsinorder[$curslotnr]->slot = $slotsinorder[$curslotnr]->slot - 1;
+                    $DB->update_record('offlinequiz_group_questions', $slotsinorder[$curslotnr]);
+                }
+            }
+        }
+
+        $trans->allow_commit();
+    }
+}
+/**
+ * update queue status.
+ * @param mixed $queueid
+ * @return void
+ */
+function update_queue_status($queueid) {
+    global $DB;
+    $sql = "SELECT DISTINCT status, count(status)
+            FROM {offlinequiz_queue_data} qd
+            WHERE qd.queueid = :queueid
+            GROUP BY status";
+    $statuslist = $DB->get_records_sql($sql, ['queueid' => $queueid]);
+    if (array_key_exists('error', $statuslist)) {
+        $DB->set_field('offlinequiz_queue', 'status', 'error', ['id' => $queueid]);
+        return;
+    } else if (array_key_exists('processing', $statuslist)) {
+        $DB->set_field('offlinequiz_queue', 'status', 'processing', ['id' => $queueid]);
+        return;
+    } else if (!count($statuslist)) {
+        $DB->set_field('offlinequiz_queue', 'status', 'new', ['id' => $queueid]);
+    } else {
+        $DB->set_field('offlinequiz_queue', 'status', 'processed', ['id' => $queueid]);
+    }
+}

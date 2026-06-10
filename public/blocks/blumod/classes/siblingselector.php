@@ -90,21 +90,38 @@ class sibling_selector
         $blus = $DB->get_records_sql($sql, $params);
 
         return $blus;
-    }
+    }   
     private function get_possible()
     {
         global $DB;
+        /* $sql = "SELECT bs.id, bs.description
+                   FROM {block_blu} b 
+                   INNER JOIN {block_blu} bs
+                       ON b.course = bs.course
+                       AND b.id != bs.id
+                   LEFT JOIN {block_blu{$this->type}} bp
+                       ON b.id = bp.id_blu
+                       AND bs.id = bp.id_{$this->type}
+                   WHERE b.id = :bluid
+                       AND bp.id_{$this->type} IS NULL
+                   ORDER BY bs.description ASC";
+        */
+        $other = ($this->type === self::PRE) ? self::SUB : self::PRE;
         $sql = "SELECT bs.id, bs.description
-                      FROM {block_blu} b 
-                        INNER JOIN {block_blu} bs
-                            ON b.course = bs.course
-                                AND b.id != bs.id
-                        LEFT JOIN {block_blu{$this->type}} bp
-                            ON b.id = bp.id_blu
-                             AND bs.id = bp.id_{$this->type}
-                     WHERE b.id = :bluid
-                        AND bp.id_{$this->type} IS NULL
-                     ORDER BY bs.description ASC";
+                FROM {block_blu} b
+                INNER JOIN {block_blu} bs
+                    ON b.course = bs.course
+                    AND b.id != bs.id
+                LEFT JOIN {block_blu{$this->type}} bp
+                    ON b.id = bp.id_blu
+                    AND bs.id = bp.id_{$this->type}
+                LEFT JOIN {block_blu{$other}} bo
+                    ON b.id = bo.id_blu
+                    AND bs.id = bo.id_{$other}
+                WHERE b.id = :bluid
+                    AND bp.id_{$this->type} IS NULL
+                    AND bo.id_{$other} IS NULL
+                ORDER BY bs.description ASC";
 
         $params = ['bluid' => $this->bluid];
         $blus = $DB->get_records_sql($sql, $params);

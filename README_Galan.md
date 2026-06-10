@@ -79,11 +79,35 @@ git merge -X theirs origin/MOODLE_NNN_STABLE
 
 ### Plugins utilizados
 
-La siguiente lista de plugins debe de actualizarse con el cambio de versión major:
+La siguiente lista de plugins debe de actualizarse con el cambio de versión major, ya que están instalados en el servidor eLearning:
 
 ```
 block_completion_progress
+block_configurable_reports
+block_demostudent
+block_people
+block_taggedcoursesearch
 block_xp
+booktool_wordimport
+filter_multilang2
+filter_wiris
+format_onetopic
+local_mail
+local_staticpage
+mod_groupselect
+mod_offlinequiz
+mod_pdfannotator
+mod_scheduler
+mod_vpl
+qbehaviour_adaptivemultipart
+qbehaviour_dfcbmexplicitvaildate
+qbehaviour_dfexplicitvaildate
+qbehaviour_regexpadaptivewithhelp
+qbehaviour_regexpadaptivewithhelpnopenalty
+qtype_regexp
+qtype_stack
+quizaccess_onesession
+theme_adaptable
 theme_moove
 ```
 
