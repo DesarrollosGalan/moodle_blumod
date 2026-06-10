@@ -66,7 +66,7 @@ class resource_selector {
             'class' => 'form-control',
             'value' => '',
             'placeholder' => get_string('searchresourcesplaceholder', 'block_blumod'),
-            'autocomplete' => 'off',
+            'autocomplete' => 'off'
         ]);
         $output .= html_writer::end_div();
 
@@ -74,7 +74,6 @@ class resource_selector {
         $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
 
         $output .= html_writer::tag('h2', get_string('assignedresources', 'block_blumod'));
-
         $output .= $this->displaySelect($this->name. '_assigned', $assigned);
         $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name. '_assigned"><i class="fa fa-unlink"></i> '. get_string('delblu', 'block_blumod') . '</button>';
 

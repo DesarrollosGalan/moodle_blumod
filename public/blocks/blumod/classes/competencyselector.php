@@ -67,15 +67,29 @@ class competency_selector {
         }
 
         $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector' ]);
-
         $output .= html_writer::tag('h2', get_string('availablecompetencies', 'block_blumod'));
-        $output .= $this->displaySelect($this->name. '_available', $available);
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
+
+        $searchid = $this->name . '_search';
+        $availableid = $this->name . '_available';        
+        $output .= html_writer::start_div('mb-2');
+        $output .= html_writer::label(get_string('searchcompetencies', 'block_blumod'), $searchid, false, ['class' => 'form-label']);
+        $output .= html_writer::empty_tag('input', [
+            'type' => 'text',
+            'id' => $searchid,            
+            'class' => 'form-control',
+            'value' => '',
+            'placeholder' => get_string('searchcompetenciesplaceholder', 'block_blumod'),
+            'autocomplete' => 'off'
+        ]);
         $output .= html_writer::end_tag('div');
+
+        $output .= $this->displaySelect($availableid, $available);
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
 
         $output .= html_writer::tag('h2', get_string('assignedcompetencies', 'block_blumod'));
         $output .= $this->displaySelect($this->name. '_assigned', $assigned);
         $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name. '_assigned"><i class="fa fa-unlink"></i> '. get_string('delblu', 'block_blumod') . '</button>';
+        
         $output .= html_writer::end_tag('div');
 
         return $output;

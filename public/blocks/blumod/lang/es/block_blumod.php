@@ -31,3 +31,5 @@ $string['reportblumod'] = 'Informe en el curso acerca de BLUs';
 $string['assigncompetencies'] = 'Asignar comptencias a BLUs';
 $string['availablecompetencies'] = 'Competencias disponibles';
 $string['assignedcompetencies'] = 'Competencias asignadas';
+$string['searchcompetencies'] = 'Buscar competencias';
+$string['searchcompetenciesplaceholder'] = 'Escriba al menos 3 caracteres para filtrar las competencias disponibles';

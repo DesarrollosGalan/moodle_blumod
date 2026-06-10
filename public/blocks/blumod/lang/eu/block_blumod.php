@@ -31,3 +31,5 @@ $string['reportblumod'] = 'Ikastaro batean dauden BLUei dagokien txostena';
 $string['assigncompetencies'] = 'BLU eta konpetentzia lotzeko aukera';
 $string['availablecompetencies'] = 'Konpetentzia eskuragarriak';
 $string['assignedcompetencies'] = 'Konpetentzia esleituak';
+$string['searchcompetencies'] = 'Bilatu konpetentziak';
+$string['searchcompetenciesplaceholder'] = 'Idatzi gutxienez 3 karaktere konpetentzia eskuragarriak filtratzeko';

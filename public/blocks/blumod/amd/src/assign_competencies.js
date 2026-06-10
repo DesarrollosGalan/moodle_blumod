@@ -1,22 +1,21 @@
-
-define('block_blumod/assign_resources', [], function() {
+define('block_blumod/assign_competencies', [], function() {
     const MIN_FILTER_CHARS = 3;
 
     function init() {
         const bluSelector = document.getElementById('bluselector');
-        const resourcesContainer = document.getElementById('resources');
-        if (!bluSelector || !resourcesContainer) {
+        const competenciesContainer = document.getElementById('competencies');
+        if (!bluSelector || !competenciesContainer) {
             return;
         }
 
         if (bluSelector.value) {
-            asignarBlu(bluSelector.value);
-            llamarresources(bluSelector.value);
+            asignarBLU(bluSelector.value);
+            llamarCompetencies(bluSelector.value);
         }
 
         bluSelector.addEventListener('change', function(event) {
-            asignarBlu(event.target.value);
-            llamarresources(event.target.value);
+            asignarBLU(event.target.value);
+            llamarCompetencies(event.target.value);
         });
 
         document.querySelectorAll('.validate-selected').forEach(function(hiddenId) {
@@ -27,7 +26,7 @@ define('block_blumod/assign_resources', [], function() {
             });
         });
 
-        resourcesContainer.addEventListener('click', function(event) {
+        competenciesContainer.addEventListener('click', function(event) {
             const button = event.target.closest('button[data-action][data-from]');
             if (!button) {
                 return;
@@ -46,18 +45,22 @@ define('block_blumod/assign_resources', [], function() {
             return;
         }
 
+        if (isFrameworkOption(control.value)) {
+            return;
+        }
+
         const bluid = bluSelector.value;
-        asignarBlu(bluid);
-        llamarresources(bluid, action, control.value);
+        asignarBLU(bluid);
+        llamarCompetencies(bluid, action, control.value);
     }
 
-    function asignarBlu(bluid) {
-        document.querySelectorAll('[name=id]').forEach(function(hiddenId) {
+    function asignarBLU(bluid) {
+        document.querySelectorAll('[name=id], [name=bluid]').forEach(function(hiddenId) {
             hiddenId.value = bluid;
         });
     }
 
-    function llamarresources(bluid, action, value) {
+    function llamarCompetencies(bluid, action, value) {
         const courseid = (new URLSearchParams(window.location.search)).get('courseid');
         if (!courseid) {
             return;
@@ -65,7 +68,7 @@ define('block_blumod/assign_resources', [], function() {
 
         const params = new URLSearchParams({
             courseid: courseid,
-            id: bluid
+            bluid: bluid
         });
 
         if (action && value) {
@@ -73,28 +76,28 @@ define('block_blumod/assign_resources', [], function() {
             params.set('modid', value);
         }
 
-        const url = M.cfg.wwwroot + '/blocks/blumod/resources.php?' + params.toString();
+        const url = M.cfg.wwwroot + '/blocks/blumod/competencies.php?' + params.toString();
 
         fetch(url)
             .then(function(response) {
                 return response.text();
             })
             .then(function(data) {
-                const resourcesContainer = document.getElementById('resources');
-                if (!resourcesContainer) {
+                const competenciesContainer = document.getElementById('competencies');
+                if (!competenciesContainer) {
                     return;
                 }
-                resourcesContainer.innerHTML = data;
+                competenciesContainer.innerHTML = data;
                 bindSearchFilter();
             })
             .catch(function() {
-                console.log('Error fetching resources');
+                console.log('Error fetching competencies');
             });
     }
 
     function bindSearchFilter() {
-        const searchInput = document.getElementById('resourceselector_search');
-        const availableSelect = document.getElementById('resourceselector_available');
+        const searchInput = document.getElementById('competencyselector_search');
+        const availableSelect = document.getElementById('competencyselector_available');
         if (!searchInput || !availableSelect) {
             return;
         }
@@ -110,12 +113,20 @@ define('block_blumod/assign_resources', [], function() {
         const doFilter = pattern.length >= MIN_FILTER_CHARS;
 
         Array.prototype.forEach.call(availableSelect.options, function(option) {
+            if (isFrameworkOption(option.value)) {
+                option.hidden = false;
+                return;
+            }
             if (!doFilter) {
                 option.hidden = false;
                 return;
             }
             option.hidden = option.text.toLowerCase().indexOf(pattern) === -1;
         });
+    }
+
+    function isFrameworkOption(value) {
+        return typeof value === 'string' && value.indexOf('F') === 0;
     }
 
     return {
