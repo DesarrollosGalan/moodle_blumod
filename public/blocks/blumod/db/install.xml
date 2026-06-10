@@ -52,7 +52,7 @@
         <KEY NAME="ix_course" TYPE="foreign" FIELDS="course" REFTABLE="course"  REFFIELDS="id"/>
       </KEYS>
     </TABLE>
-    <TABLE NAME="block_blucompetency" COMMENT="Comptencias asociadas a BLU">
+    <TABLE NAME="block_blucompetency" COMMENT="Competencias asociadas a BLU">
       <FIELDS>
         <FIELD NAME="id"           TYPE="int" LENGTH="19" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="competencyid" TYPE="int" LENGTH="19" NOTNULL="true" SEQUENCE="false"/>
