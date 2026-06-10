@@ -37,7 +37,7 @@ $url = new moodle_url('/block/blumod/assign_resources.php', ['courseid'=>$course
 $PAGE->set_url($url);
 require_login($course);
 
-$PAGE->requires->js('/blocks/blumod/assign_resources.js',true);
+$PAGE->requires->js_call_amd('block_blumod/assign_resources', 'init');
 
 $context = context_course::instance($course->id);
 $PAGE->set_context($context);

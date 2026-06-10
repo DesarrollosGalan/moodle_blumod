@@ -55,7 +55,22 @@ class resource_selector {
         $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector' ]);
         $output .= html_writer::tag('h2', get_string('availableresources', 'block_blumod'));
 
-        $output .= $this->displaySelect($this->name. '_available', $available);
+        $searchid = $this->name . '_search';
+        $availableid = $this->name . '_available';
+        $output .= html_writer::start_div('mb-2');
+        $output .= html_writer::label(get_string('searchresources', 'block_blumod'), $searchid, false, ['class' => 'form-label']);
+        $output .= html_writer::empty_tag('input', [
+            'type' => 'text',
+            'id' => $searchid,
+            'name' => $searchid,
+            'class' => 'form-control',
+            'value' => '',
+            'placeholder' => get_string('searchresourcesplaceholder', 'block_blumod'),
+            'autocomplete' => 'off',
+        ]);
+        $output .= html_writer::end_div();
+
+        $output .= $this->displaySelect($availableid, $available);
         $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
 
         $output .= html_writer::tag('h2', get_string('assignedresources', 'block_blumod'));
