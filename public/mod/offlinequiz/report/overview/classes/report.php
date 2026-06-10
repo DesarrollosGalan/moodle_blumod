@@ -1,0 +1,882 @@
+<?php
+// This file is part of mod_offlinequiz for Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * The results overview report for offlinequizzes
+ *
+ * @package offlinequiz_overview
+ * @subpackage offlinequiz
+ * @author Juergen Zimmer <zimmerj7@univie.ac.at>
+ * @copyright 2015 Academic Moodle Cooperation {@link http://www.academic-moodle-cooperation.org}
+ * @since Moodle 2.1
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ *
+ *
+ */
+namespace offlinequiz_overview;
+defined('MOODLE_INTERNAL') || die();
+use mod_offlinequiz\default_report;
+use moodle_url;
+use navigation_node;
+use context_module;
+use context_system;
+use offlinequiz_results_table;
+use MoodleODSWorkbook;
+use MoodleExcelWorkbook;
+use question_engine;
+use context_course;
+use html_writer;
+
+require_once($CFG->libdir . '/tablelib.php');
+require_once($CFG->dirroot . '/mod/offlinequiz/report/overview/results_table.php');
+require_once($CFG->libdir . '/gradelib.php');
+
+/**
+ * Report for the results overview
+ */
+class report extends default_report {
+    /**
+     * display the report
+     * @param mixed $offlinequiz
+     * @param mixed $cm
+     * @param mixed $course
+     * @return bool
+     */
+    public function display($offlinequiz, $cm, $course) {
+        global $CFG, $OUTPUT, $SESSION, $DB;
+        $download = optional_param('download', null, PARAM_TEXT);
+        // Deal with actions.
+        $action = optional_param('action', '', PARAM_ACTION);
+
+        // Set table options.
+        $noresults = optional_param('noresults', 0, PARAM_INT);
+        // Set and safe pagesize according to user preferences.
+        $pspreference = get_user_preferences('offlinequiz_pagesize');
+        if ($pspreference) {
+            $pagesizedefault = $pspreference;
+        } else {
+            $pagesizedefault = 20;
+        }
+        $pagesize = optional_param('pagesize', $pagesizedefault, PARAM_INT);
+
+        if (!$pspreference) {
+            set_user_preference('offlinequiz_pagesize', $pagesize);
+        }
+        if ($pagesize != $pagesizedefault) {
+            set_user_preference('offlinequiz_pagesize', $pagesize);
+        }
+
+        $groupid = optional_param('group', 0, PARAM_INT);
+
+        if ($download && $download == "html") {
+            $selectedresultids = [];
+
+            $offlinequizid = required_param('q', PARAM_INT);
+
+            $download = new html_download($offlinequizid);
+            $download->printhtml();
+            return;
+        }
+
+        // Define some strings.
+        $strtimeformat = get_string('strftimedatetime');
+        if ($download == 'CSV') {
+            $strtimeformat = str_replace(',', '', $strtimeformat);
+        }
+        $letterstr = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+        $offlinequizconfig = get_config('offlinequiz');
+
+        $context = context_module::instance($cm->id);
+        $systemcontext = context_system::instance();
+
+        // Only print headers if not asked to download data or delete data.
+        if (!$download && !$action == 'delete') {
+            $this->print_header_and_tabs($cm, $course, $offlinequiz, 'overview');
+            echo $OUTPUT->box_start('linkbox');
+            echo $OUTPUT->heading(get_string('results', 'offlinequiz'));
+
+            require_once($CFG->libdir . '/grouplib.php');
+            $groupselecturl = new moodle_url(
+                $CFG->wwwroot . '/mod/offlinequiz/report.php',
+                ['id' => $cm->id,
+                            'mode' => 'overview',
+                            'noresults' => $noresults,
+                            'pagesize' => $pagesize,
+                            'group' => $groupid,
+                ]
+            );
+
+            echo groups_print_activity_menu($cm, $groupselecturl, true);
+            echo $OUTPUT->box_end();
+            echo '<br/>';
+        }
+
+        if ($pagesize < 1) {
+            $pagesize = 10;
+        }
+
+        $answerletters = 'abcdefghijklmnopqrstuvwxyz';
+
+        if ($action == 'delete' && confirm_sesskey()) {
+            require_capability('mod/offlinequiz:grade', context_module::instance($cm->id));
+
+            $selectedresultids = [];
+            $params = (array) data_submitted();
+
+            foreach ($params as $key => $value) {
+                if (preg_match('!^s([0-9]+)$!', $key, $matches)) {
+                    $selectedresultids[] = $matches[1];
+                }
+            }
+
+            if ($selectedresultids) {
+                foreach ($selectedresultids as $resultid) {
+                    if (
+                        $resultid && $todelete = $DB->get_record(
+                            'offlinequiz_results',
+                            ['id' => $resultid,
+                            ]
+                        )
+                    ) {
+                        offlinequiz_delete_result($resultid, $context);
+
+                        // Log this event.
+                        $params = ['objectid' => $resultid,
+                            'relateduserid' => $todelete->userid,
+                            'context' => context_module::instance($cm->id),
+                            'other' => ['mode' => 'overview',
+                            ],
+                        ];
+                        $event = \mod_offlinequiz\event\attempt_deleted::create($params);
+                        $event->trigger();
+
+                        // Change the status of all related pages with error 'resultexists' to
+                        // 'suspended'.
+                        $user = $DB->get_record(
+                            'user',
+                            ['id' => $todelete->userid,
+                            ]
+                        );
+                        $group = $DB->get_record(
+                            'offlinequiz_groups',
+                            ['id' => $todelete->offlinegroupid,
+                            ]
+                        );
+
+                        $sql = "SELECT id
+                                  FROM {offlinequiz_scanned_pages}
+                                 WHERE offlinequizid = :offlinequizid
+                                   AND userkey = :userkey
+                                   AND groupnumber = :groupnumber
+                                   AND status = 'error'
+                                   AND (error = 'resultexists' OR error = 'differentresultexists')";
+                        $params = ['offlinequizid' => $offlinequiz->id,
+                            'userkey' => $user->{$offlinequizconfig->ID_field},
+                            'groupnumber' => $group->groupnumber,
+                        ];
+                        $otherpages = $DB->get_records_sql($sql, $params);
+                        foreach ($otherpages as $page) {
+                            $DB->set_field(
+                                'offlinequiz_scanned_pages',
+                                'status',
+                                'suspended',
+                                ['id' => $page->id,
+                                ]
+                            );
+                            $DB->set_field(
+                                'offlinequiz_scanned_pages',
+                                'error',
+                                '',
+                                ['id' => $page->id,
+                                ]
+                            );
+                        }
+                    }
+                }
+                offlinequiz_grade_item_update($offlinequiz, 'reset');
+                offlinequiz_update_grades($offlinequiz);
+            }
+            redirect(
+                new moodle_url(
+                    '/mod/offlinequiz/report.php',
+                    ['mode' => 'overview', 'id' => $cm->id,
+                        'noresults' => $noresults, 'group' => $groupid,
+                        'pagesize' => $pagesize,
+                    ]
+                )
+            );
+        }
+
+        // Now check if asked download of data.
+        if ($download) {
+            $filename = clean_filename(
+                "$course->shortname " . format_string($offlinequiz->name, true)
+            );
+            $sort = '';
+        }
+
+        // Fetch the group data.
+        $groups = $DB->get_records(
+            'offlinequiz_groups',
+            ['offlinequizid' => $offlinequiz->id,
+            ],
+            'groupnumber',
+            '*',
+            0,
+            $offlinequiz->numgroups
+        );
+
+        // Define table columns.
+        $tablecolumns = ['checkbox', 'picture', 'fullname', $offlinequizconfig->ID_field,
+            'timestart', 'offlinegroupid', 'sumgrades',
+        ];
+
+        $tableheaders = [
+            '<input type="checkbox" class="select-all-checkbox"/>', '',
+            get_string('fullname'), offlinequiz_get_id_field_name(),
+            get_string('importedon', 'offlinequiz'), get_string('group'),
+            get_string('grade', 'offlinequiz'),
+        ];
+
+        $checked = [];
+        // Get participants list.
+        $withparticipants = false;
+        if (
+            $lists = $DB->get_records(
+                'offlinequiz_p_lists',
+                ['offlinequizid' => $offlinequiz->id,
+                ]
+            )
+        ) {
+            $withparticipants = true;
+            $tablecolumns[] = 'checked';
+            $tableheaders[] = get_string('present', 'offlinequiz');
+            foreach ($lists as $list) {
+                $participants = $DB->get_records(
+                    'offlinequiz_participants',
+                    ['listid' => $list->id,
+                    ]
+                );
+                foreach ($participants as $participant) {
+                    $checked[$participant->userid] = $participant->checked;
+                }
+            }
+        }
+
+        // Set up the table in any case, even if we are downloading a file.
+        $params = ['offlinequiz' => $offlinequiz, 'noresults' => $noresults, 'pagesize' => $pagesize, 'group' => $groupid,
+        ];
+        $table = new offlinequiz_results_table('mod-offlinequiz-report-overview-report', $params);
+
+        $table->define_columns($tablecolumns);
+        $table->define_headers($tableheaders);
+        $baseurl = new moodle_url(
+            $CFG->wwwroot . '/mod/offlinequiz/report.php',
+            ['mode' => 'overview', 'id' => $cm->id, 'noresults' => $noresults, 'group' => $groupid,
+                    'pagesize' => $pagesize,
+            ]
+        );
+        $table->define_baseurl($baseurl);
+
+        $table->sortable(true);
+        $table->no_sorting('checkbox');
+
+        if ($withparticipants) {
+            $table->no_sorting('checked');
+        }
+
+        $table->column_class(1, 'picture');
+        $table->column_class(2, 'userkey');
+        $table->column_class(3, 'timestart');
+        $table->column_class(4, 'offlinegroupid');
+        $table->column_class(5, 'sumgrades');
+
+        $table->set_attribute('cellpadding', '2');
+        $table->set_attribute('id', 'attempts');
+        $table->set_attribute('class', 'generaltable generalbox');
+
+        // Start working -- this is necessary as soon as the niceties are over.
+        $table->setup();
+
+        if ($download == 'ODS' || $download == 'Excel') {
+            if ($download == 'ODS') {
+                require_once("$CFG->libdir/odslib.class.php");
+                $filename .= ".ods";
+                // Creating a workbook.
+                $workbook = new MoodleODSWorkbook("-");
+            } else {
+                require_once("$CFG->libdir/excellib.class.php");
+                $filename .= ".xls";
+                // Creating a workbook.
+                $workbook = new MoodleExcelWorkbook("-");
+            }
+            // Sending HTTP headers.
+            $workbook->send($filename);
+            require($CFG->dirroot  . '/mod/offlinequiz/sheetlib.php');
+            [$myxls, $formats] = offlinequiz_sheetlib_initialize_headers($workbook);
+
+            // Here starts workshhet headers.
+            $headers = [offlinequiz_get_id_field_name(), get_string('firstname'),
+                get_string('lastname'), get_string('importedon', 'offlinequiz'),
+                get_string('group'), get_string('grade', 'offlinequiz'), get_string('letter', 'offlinequiz'),
+            ];
+            if (!empty($withparticipants)) {
+                $headers[] = get_string('present', 'offlinequiz');
+            }
+            $colnum = 0;
+            foreach ($headers as $item) {
+                $myxls->write(0, $colnum, $item, $formats['formatbc']);
+                $colnum++;
+            }
+            $rownum = 1;
+        } else if ($download == 'CSV') {
+            $filename .= ".csv";
+            header("Content-Encoding: UTF-8");
+            header("Content-Type: text/csv; charset=utf-8");
+            header("Content-Disposition: attachment; filename=\"$filename\"");
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate,post-check=0,pre-check=0");
+            header("Pragma: public");
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM.
+
+            $headers = offlinequiz_get_id_field_name() . ", " . get_string('firstname') . ", " . get_string("lastname") .
+                     ", " . get_string('importedon', 'offlinequiz') . ", " . get_string('group') .
+                     ", " . get_string('grade', 'offlinequiz') . ", " . get_string('letter', 'offlinequiz');
+            if (!empty($withparticipants)) {
+                $headers .= ", " . get_string('present', 'offlinequiz');
+            }
+            echo $headers . " \n";
+        } else if ($download == 'CSVplus1' || $download == 'CSVpluspoints') {
+            $filename .= ".csv";
+            header("Content-Encoding: UTF-8");
+            header("Content-Type: text/csv; charset=utf-8");
+            header("Content-Disposition: attachment; filename=\"$filename\"");
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate,post-check=0,pre-check=0");
+            header("Pragma: public");
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM.
+
+            // Print the table headers.
+            echo get_string('firstname') . ',' . get_string('lastname') . ',' .
+                offlinequiz_get_id_field_name() . ',' . get_string('group');
+            $maxquestions = offlinequiz_get_maxquestions($offlinequiz, $groups);
+            for ($i = 0; $i < $maxquestions; $i++) {
+                echo ', ' . get_string('question') . ' ' . ($i + 1);
+            }
+            echo "\n";
+
+            // Print the correct answer bit-strings.
+            foreach ($groups as $group) {
+                if ($group->templateusageid) {
+                    $quba = question_engine::load_questions_usage_by_activity(
+                        $group->templateusageid
+                    );
+                    $slots = $quba->get_slots();
+                    echo ', ,' . get_string('correct', 'offlinequiz');
+                    echo ',' . $group->groupnumber;
+                    foreach ($slots as $slot) {
+                        $slotquestion = $quba->get_question($slot);
+                        $qtype = $slotquestion->get_type_name();
+                        if ($qtype == 'multichoice' || $qtype == 'multichoiceset') {
+                            $attempt = $quba->get_question_attempt($slot);
+                            $order = $slotquestion->get_order($attempt); // Order of the answers.
+                            $tempstr = ",";
+                            $letters = [];
+                            $counter = 0;
+                            foreach ($order as $key => $answerid) {
+                                $fraction = $DB->get_field(
+                                    'question_answers',
+                                    'fraction',
+                                    ['id' => $answerid,
+                                    ]
+                                );
+                                if ($fraction > 0) {
+                                    $letters[] = $answerletters[$counter];
+                                }
+                                $counter++;
+                            }
+                            if (empty($letters)) {
+                                $tempstr .= '99';
+                            } else {
+                                $tempstr .= implode('/', $letters);
+                            }
+                            echo $tempstr;
+                        }
+                    }
+                    echo "\n";
+                }
+            }
+        }
+
+        $coursecontext = context_course::instance($course->id);
+
+        $contextids = $coursecontext->get_parent_context_ids(true);
+
+        // Construct the SQL
+        // First get roleids for students from leagcy.
+        if (
+            !$roles = get_roles_with_capability(
+                'mod/offlinequiz:attempt',
+                CAP_ALLOW,
+                $systemcontext
+            )
+        ) {
+            error("No roles with capability 'moodle/offlinequiz:attempt' defined in system context");
+        }
+        $roleids = [];
+        foreach ($roles as $role) {
+            $roleids[] = $role->id;
+        }
+
+        $rolelist = implode(',', $roleids);
+
+        $select = "SELECT " . $DB->sql_concat('u.id', "'#'", "COALESCE(qa.usageid, 0)") . " AS uniqueid,
+        qa.id AS resultid, u.id, qa.usageid, qa.offlinegroupid, qa.status,
+        u.id AS userid, u.firstname, u.lastname,
+        u.alternatename, u.middlename, u.firstnamephonetic, u.lastnamephonetic,
+        u.picture, u." . $offlinequizconfig->ID_field . ",
+        qa.sumgrades, qa.timefinish, qa.timestart, qa.timefinish - qa.timestart AS duration ";
+
+        $result = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+        [$contexttest, $cparams] = $result;
+        [$roletest, $rparams] = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED, 'role');
+
+        $from = " FROM {user} u
+                  JOIN {role_assignments} ra ON ra.userid = u.id
+             LEFT JOIN {offlinequiz_results} qa ON u.id = qa.userid AND qa.offlinequizid = :offlinequizid
+             ";
+
+        $where = " WHERE ra.contextid $contexttest AND ra.roleid $roletest ";
+
+        $params = ['offlinequizid' => $offlinequiz->id];
+        $params = array_merge($params, $cparams, $rparams);
+
+        if (empty($noresults)) {
+            $where = $where . " AND qa.userid IS NOT NULL
+                                AND qa.status = 'complete' "; // Show ONLY students with results.
+        } else if ($noresults == 1) {
+            // The value noresults = 1 means only no results, so make the left join ask for only
+            // records
+            // where the right is null (no results).
+            $where .= ' AND qa.userid IS NULL '; // Show ONLY students without results.
+        } else if ($noresults == 3) {
+            // We want all results, also the partial ones.
+            $from = "FROM {user} u
+                      JOIN {offlinequiz_results} qa ON u.id = qa.userid ";
+            $where = " WHERE qa.offlinequizid = :offlinequizid ";
+        } // The value noresults = 2 means we want all students, with or without results.
+
+        if ($groupid) {
+            $from .= " JOIN {groups_members} gm ON gm.userid = u.id ";
+            $where .= " AND gm.groupid = :groupid ";
+            $params['groupid'] = $groupid;
+        }
+
+        $countsql = 'SELECT COUNT(DISTINCT(u.id)) ' . $from . $where;
+
+        // Count the records NOW, before funky question grade sorting messes up $from.
+        $totalinitials = $DB->count_records_sql($countsql, $params);
+
+        // Add extra limits due to initials bar.
+        [$ttest, $tparams] = $table->get_sql_where();
+
+        if (!empty($ttest)) {
+            $where .= ' AND ' . $ttest;
+            $countsql .= ' AND ' . $ttest;
+            $params = array_merge($params, $tparams);
+        }
+
+        $total = $DB->count_records_sql($countsql, $params);
+
+        // Add extra limits due to sorting by question grade.
+        $tablesort = $table->get_sql_sort();
+
+        $table->pagesize($pagesize, $total);
+
+        // Fix some wired sorting.
+        if (empty($tablesort)) {
+            $sort = ' ORDER BY u.lastname, u.id ';
+        } else {
+            $sort = ' ORDER BY ' . $tablesort . ', u.id';
+        }
+
+        // Fetch the results.
+        if (!$download) {
+            $results = $DB->get_records_sql(
+                $select . $from . $where . $sort,
+                $params,
+                $table->get_page_start(),
+                $table->get_page_size()
+            );
+        } else {
+            $results = $DB->get_records_sql($select . $from . $where . $sort, $params);
+        }
+
+        // Build table rows.
+        if (!$download) {
+            $table->initialbars(true);
+        }
+        if (!empty($results) || !empty($noresults)) {
+            foreach ($results as $result) {
+                $user = $DB->get_record(
+                    'user',
+                    ['id' => $result->userid,
+                    ]
+                );
+                $picture = $OUTPUT->user_picture(
+                    $user,
+                    ['courseid' => $course->id,
+                    ]
+                );
+
+                if (!empty($result->resultid)) {
+                    $checkbox = '<input type="checkbox" name="s' . $result->resultid . '" value="' .
+                             $result->resultid . '"  class="select-multiple-checkbox" />';
+                } else {
+                    $checkbox = '';
+                }
+
+                if (!empty($result) && (empty($result->resultid) || $result->timefinish == 0)) {
+                    $resultdate = '-';
+                } else {
+                    $resultdate = userdate($result->timefinish, $strtimeformat);
+                }
+
+                if (!empty($result) && $result->offlinegroupid) {
+                    $groupletter = $letterstr[$groups[$result->offlinegroupid]->groupnumber];
+                } else {
+                    $groupletter = '-';
+                }
+
+                $userlink = '<a href="' . $CFG->wwwroot . '/user/view.php?id=' . $result->userid .
+                         '&amp;course=' . $course->id . '">' . fullname($result) . '</a>';
+
+                if (!$download) {
+                    $row = [$checkbox, $picture, $userlink,
+                        $result->{$offlinequizconfig->ID_field}, $resultdate, $groupletter,
+                    ];
+                } else {
+                    $row = [$result->{$offlinequizconfig->ID_field}, $result->firstname,
+                        $result->lastname, $resultdate, $groupletter,
+                    ];
+                }
+
+                if (
+                    !empty($result)
+                    && $result->offlinegroupid
+                    && $groups[$result->offlinegroupid]->sumgrades * $offlinequiz->grade
+                ) {
+                    $outputgrade = format_float($result->sumgrades /
+                            $groups[$result->offlinegroupid]->sumgrades * $offlinequiz->grade, $offlinequiz->decimalpoints, false);
+                } else {
+                    $outputgrade = '-';
+                }
+
+                if (!$download) {
+                    if ($result->status == 'partial') {
+                        $row[] = get_string('partial', 'offlinequiz');
+                    } else if ($result->sumgrades === null) {
+                        $row[] = '-';
+                    } else {
+                        $row[] = '<a href="review.php?q=' . $offlinequiz->id . '&amp;resultid=' .
+                                 $result->resultid . '">' . $outputgrade . '</a>';
+                    }
+                    if ($withparticipants) {
+                        $row[] = !empty($checked[$result->userid])
+                                  ? "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/tick.gif\" alt=\"" .
+                                 get_string('ischecked', 'offlinequiz') . "\">"
+                                  : "<img src=\"$CFG->wwwroot/mod/offlinequiz/pix/cross.gif\" alt=\"" .
+                                 get_string('isnotchecked', 'offlinequiz') . "\">";
+                    }
+                } else if ($download != 'CSVplus1') {
+                    $row[] = $result->sumgrades === null ? '-' : format_float($outputgrade, $offlinequiz->decimalpoints, false);
+                    $row[] = $this->get_grade($context, $course->id, $offlinequiz->id, $result->userid);
+                    if ($withparticipants) {
+                        if (array_key_exists($result->userid, $checked)) {
+                            $row[] = $checked[$result->userid] ? get_string('ok') : '-';
+                        } else {
+                            $row[] = '-';
+                        }
+                    }
+                }
+
+                if (!$download) {
+                    $table->add_data($row);
+                } else if ($download == 'Excel' || $download == 'ODS') {
+                    $colnum = 0;
+                    foreach ($row as $item) {
+                        $myxls->write($rownum, $colnum, $item, $formats['format']);
+                        $colnum++;
+                    }
+                    $rownum++;
+                } else if ($download == 'CSV') {
+                    $text = implode(',', $row);
+                    echo $text . "\n";
+                } else if ($download == 'CSVplus1' || $download == 'CSVpluspoints') {
+                    $text = $row[1] . ',' . $row[2] . ',' . $row[0] . ',' .
+                             $letterstr[$groups[$result->offlinegroupid]->groupnumber];
+                    if (
+                        $pages = $DB->get_records(
+                            'offlinequiz_scanned_pages',
+                            ['resultid' => $result->resultid,
+                            ],
+                            'pagenumber ASC'
+                        )
+                    ) {
+                        foreach ($pages as $page) {
+                            if ($page->status == 'ok' || $page->status == 'submitted') {
+                                $choices = $DB->get_records(
+                                    'offlinequiz_choices',
+                                    ['scannedpageid' => $page->id,
+                                    ],
+                                    'slotnumber, choicenumber'
+                                );
+                                $counter = 0;
+                                $oldslot = -1;
+                                $letters = [];
+                                foreach ($choices as $choice) {
+                                    if ($oldslot == -1) {
+                                        $oldslot = $choice->slotnumber;
+                                    } else if ($oldslot != $choice->slotnumber) {
+                                        if (empty($letters)) {
+                                            $text .= ',99';
+                                        } else {
+                                            $text .= ',' . implode('/', $letters);
+                                        }
+                                        $counter = 0;
+                                        $oldslot = $choice->slotnumber;
+                                        $letters = [];
+                                    }
+                                    if ($choice->value == 1) {
+                                        $letters[] = $answerletters[$counter];
+                                    }
+                                    $counter++;
+                                }
+                                if (empty($letters)) {
+                                    $text .= ',99';
+                                } else {
+                                    $text .= ',' . implode('/', $letters);
+                                }
+                            }
+                        }
+                    }
+                    echo $text . "\n";
+
+                    if ($download == 'CSVpluspoints') {
+                        $text = $row[1] . ',' . $row[2] . ',' . $row[0] . ',' .
+                                 $letterstr[$groups[$result->offlinegroupid]->groupnumber];
+                        $quba = question_engine::load_questions_usage_by_activity($result->usageid);
+                        $slots = $quba->get_slots();
+                        foreach ($slots as $slot) {
+                            $slotquestion = $quba->get_question($slot);
+                            $attempt = $quba->get_question_attempt($slot);
+                            $text .= ',' .
+                                     format_float(
+                                         $attempt->get_mark(),
+                                         $offlinequiz->decimalpoints,
+                                         false
+                                     );
+                        }
+                        echo $text . "\n";
+                    }
+                }
+            } // End foreach results...
+        } else if (!$download) {
+            $table->print_initials_bar();
+        }
+
+        if (!$download) {
+            // Print table.
+            $table->finish_html();
+
+            if (!empty($results)) {
+                echo '<div>';
+                echo '<form id="downloadoptions" action="report.php" method="get">';
+                echo ' <input type="hidden" name="id" value="' . $cm->id . '" />';
+                echo ' <input type="hidden" name="q" value="' . $offlinequiz->id . '" />';
+                echo ' <input type="hidden" name="mode" value="overview" />';
+                echo ' <input type="hidden" name="group" value="' . $groupid . '" />';
+                echo ' <input type="hidden" name="noresults" value="' . $noresults . '" />';
+                echo ' <input type="hidden" name="noheader" value="yes" />';
+                echo ' <table class="boxaligncenter"><tr><td>';
+                $options = ['Excel' => get_string('excelformat', 'offlinequiz'),
+                    'ODS' => get_string('odsformat', 'offlinequiz'),
+                    'CSV' => get_string('csvformat', 'offlinequiz'),
+                    'CSVplus1' => get_string('csvplus1format', 'offlinequiz'),
+                    'CSVpluspoints' => get_string('csvpluspointsformat', 'offlinequiz'),
+                    'html' => get_string('html', 'offlinequiz'),
+                ];
+                print_string('downloadresultsas', 'offlinequiz');
+                echo "</td><td>";
+                echo html_writer::select($options, 'download', '', false);
+                echo ' <button type="submit" class="btn btn-primary" > ' . get_string('download') . '</button>';
+                echo ' <script type="text/javascript">' . "\n<!--\n" .
+                         'document.getElementById("noscriptmenuaction").style.display = "none";' .
+                         "\n-->\n" . '</script>';
+                echo " </td>\n";
+                echo "<td>";
+                echo "</td>\n";
+                echo '</tr></table></form></div>';
+            }
+        } else if ($download == 'Excel' || $download == 'ODS') {
+            $workbook->close();
+            exit();
+        } else if ($download == 'CSV' || $download == 'CSVplus1' || $download == 'CSVpluspoints') {
+            exit();
+        }
+
+        // Print display options.
+        echo '<div class="display-options">';
+        echo '<form id="options" action="report.php" method="get">';
+        echo ' <div>';
+        echo '   <p>' . get_string('displayoptions', 'offlinequiz') . ': </p>';
+        echo '   <input type="hidden" name="id" value="' . $cm->id . '" />';
+        echo '   <input type="hidden" name="q" value="' . $offlinequiz->id . '" />';
+        echo '   <input type="hidden" name="mode" value="overview" />';
+        echo '   <input type="hidden" name="group" value="' . $groupid . '" />';
+        echo '   <input type="hidden" name="noresults" value="' . $noresults . '" />';
+        echo '   <input type="hidden" name="detailedmarks" value="0" />';
+        echo '   <table id="overview-options" class="boxaligncenter">';
+        echo '     <tr align="left">';
+        echo '     <td><label for="pagesize">' . get_string('pagesizeparts', 'offlinequiz') .
+                  '</label></td>';
+        echo '     <td><input type="text" id="pagesize" name="pagesize" size="3" value="' . $pagesize .
+                 '" /></td>';
+        echo '</tr>';
+        echo '<tr align="left">';
+        echo '<td colspan="2">';
+
+        $options = [];
+        $options[] = get_string('attemptsonly', 'offlinequiz');
+        $options[] = get_string('noattemptsonly', 'offlinequiz');
+        $options[] = get_string('allstudents', 'offlinequiz');
+        $options[] = get_string('allresults', 'offlinequiz');
+
+        echo html_writer::select($options, 'noresults', $noresults, null);
+        echo '</td></tr>';
+        echo '<tr><td colspan="2" align="center">';
+        echo '<button type="submit" class="btn btn-secondary"> ' . get_string('go') . '</button>';
+        echo '</td></tr></table>';
+        echo '</div>';
+        echo '</form>';
+        echo '</div>';
+        echo "\n";
+
+        return true;
+    }
+    /**
+     * get the grade for a result
+     * @param mixed $context
+     * @param mixed $courseid
+     * @param mixed $offlinequizid
+     * @param mixed $userid
+     * @return string
+     */
+    private function get_grade($context, $courseid, $offlinequizid, $userid) {
+        $gradinginfo = grade_get_grades($courseid, 'mod', 'offlinequiz', $offlinequizid, $userid);
+        $gradeitem = $gradinginfo->items[0];
+        if ($gradeitem != null) {
+            $letters = grade_get_letters($context);
+            return $this->get_gradeletter($letters, $gradeitem, $userid);
+        } else {
+            return '-';
+        }
+    }
+    /**
+     * get the letter of a grade
+     * @param mixed $letters
+     * @param mixed $gradeitem
+     * @param mixed $userid
+     * @return string
+     */
+    private function get_gradeletter($letters, $gradeitem, $userid) {
+        if (!$gradeitem) {
+            return '-';
+        }
+        $grade = $gradeitem->grades[$userid];
+        // Map to range.
+        $gradeint = $gradeitem->grademax - $gradeitem->grademin;
+        $value = ($gradeint != 100 || $gradeitem->grademin != 0) ? ($grade->grade - $gradeitem->grademin
+        ) * 100 / $gradeint : $grade->grade;
+
+        // Calculate gradeletter.
+        $value = bounded_number(0, $value, 100); // Just in case.
+        foreach ($letters as $boundary => $letter) {
+            $numboundary = str_replace(',', '.', $boundary);
+            if ($value >= $numboundary) {
+                return format_string($letter);
+            }
+        }
+        return '-';
+    }
+
+    /**
+     * Add navigation nodes to mod_offlinequiz_result
+     * @param \navigation_node $navigation
+     * @param mixed $cm
+     * @param mixed $offlinequiz
+     * @return navigation_node
+     */
+    public function add_to_navigation(navigation_node $navigation, $cm, $offlinequiz): navigation_node {
+        // TO DO: Move strings to subplugin.
+        $navnode = navigation_node::create(
+            text: get_string('tabresultsoverview', 'offlinequiz'),
+            action:  new moodle_url(
+                '/mod/offlinequiz/report.php',
+                ['q' => $offlinequiz->id, 'mode' => 'overview']
+            ),
+            key: $this->get_navigation_key()
+        );
+
+        $parentnode = $navigation->get('mod_offlinequiz_results');
+        $parentnode->add_node($navnode);
+        return $navigation;
+    }
+    /**
+     * the title of this report
+     * @return string
+     */
+    public function get_report_title(): string {
+        return get_string('results', 'offlinequiz');
+    }
+    /**
+     * the navigation key of this report
+     * @return string
+     */
+    public function get_navigation_key(): string {
+        return 'tabresultsoverview';
+    }
+    /**
+     * the route tab
+     * @param mixed $offlinequiz
+     * @param mixed $cm
+     * @param mixed $course
+     * @param mixed $tab
+     * @return bool|string
+     */
+    public function route($offlinequiz, $cm, $course, $tab): string|false {
+        global $DB;
+        if ($tab == 'mod_offlinequiz_results') { // TO DO: Move to plugin Route tab..
+            $hasresults = $DB->record_exists('offlinequiz_results', ['offlinequizid' => $offlinequiz->id]);
+
+            if ($hasresults) {
+                return 'tabresultsoverview';
+            }
+        }
+        return false;
+    }
+}

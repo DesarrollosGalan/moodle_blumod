@@ -24,7 +24,9 @@ for PLUGIN in sync_upstream_moodle.sh public/blocks/blumod README_Galan.md; do
   git restore --source=$BRANCH_BACKUP $PLUGIN
 done
 
-# Otros Plugins a incorporar a la nueva rama $BRANCH
+# Otros Plugins a incorporar a la nueva rama $BRANCH, si están ya en el repo GIT
+# Si no están se actualizan vía interfaz, o con descarga y copia
+# La lista completa de plugins están en README_Galan.md
 for PLUGIN in public/blocks/configurable_reports public/blocks/people public/blocks/taggedcoursesearch public/mod/pdfannotator public/mod/quiz/accessrule/onesession public/mod/wooclap public/theme/moove; do
   # git checkout $BRANCH_BACKUP -- $PLUGIN # Legacy
   git restore --source=$BRANCH_BACKUP $PLUGIN
