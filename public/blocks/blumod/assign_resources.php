@@ -38,6 +38,7 @@ $PAGE->set_url($url);
 require_login($course);
 
 $PAGE->requires->js_call_amd('block_blumod/assign_resources', 'init');
+$PAGE->requires->js_call_amd('block_blumod/blu_graph', 'init');
 
 $context = context_course::instance($course->id);
 $PAGE->set_context($context);
@@ -57,8 +58,13 @@ echo $OUTPUT->header();
 // Selector BLUs
 echo html_writer::start_tag('div');
 echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
+echo html_writer::start_tag('div', ['style' => 'display:flex;align-items:flex-start;gap:16px;width:100%;']);
+echo html_writer::start_tag('div', ['style' => 'flex:0 0 33.33%;max-width:33.33%;min-width:0;']);
 $blu_selector = new blu_selector($courseid);
 echo $blu_selector->display();
+echo html_writer::end_tag('div');
+echo html_writer::tag('div', '', ['id' => 'blu-graph-container', 'style' => 'flex:0 0 66.67%;max-width:66.67%;min-width:0;overflow-x:auto;']);
+echo html_writer::end_tag('div');
 echo html_writer::end_tag('div');
 
 echo html_writer::start_tag('div', ['id' => 'resources']);
