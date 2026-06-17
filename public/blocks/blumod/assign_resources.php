@@ -37,6 +37,7 @@ $url = new moodle_url('/block/blumod/assign_resources.php', ['courseid'=>$course
 $PAGE->set_url($url);
 require_login($course);
 
+$PAGE->requires->strings_for_js(['relation_prerequisite', 'relation_composedof'], 'block_blumod');
 $PAGE->requires->js_call_amd('block_blumod/assign_resources', 'init');
 $PAGE->requires->js_call_amd('block_blumod/blu_graph', 'init');
 

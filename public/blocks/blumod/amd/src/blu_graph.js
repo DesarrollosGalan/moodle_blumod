@@ -61,15 +61,6 @@ define('block_blumod/blu_graph', [], function() {
         var panel = container;
         panel.innerHTML = '';
 
-        // Close button
-        var close = document.createElement('div');
-        close.textContent = '\u00d7';
-        close.style.cssText =
-            'text-align:right;cursor:pointer;font-size:20px;line-height:1;' +
-            'margin-bottom:4px;color:#888;user-select:none;';
-        close.addEventListener('click', function() { panel.style.display = 'none'; });
-        panel.appendChild(close);
-
         drawGraph(panel, data);
     }
 
@@ -83,10 +74,11 @@ define('block_blumod/blu_graph', [], function() {
 
         var preW   = 120, preH = 38;
         var subW   = 120, subH = 38;
-        var mainW  = 150, mainH = 48;
+        var mainW  = 182, mainH = 62;
         var W      = Math.max(460, container.clientWidth || 460);
         var MIN_H  = 200;
         var ROW_GAP = 60;
+        var EDGE_PAD = 14;
 
         var maxRows = Math.max(pres.length, subs.length, 1);
         var H = Math.max(MIN_H, 70 + (maxRows - 1) * ROW_GAP + 70);
@@ -97,10 +89,123 @@ define('block_blumod/blu_graph', [], function() {
         var rightX = W - margin;
         var mainY  = H / 2;
 
+        var nodes = [];
+        var edges = [];
+
+        function addNode(node) {
+            nodes.push(node);
+            return node;
+        }
+
+        var mainNode = addNode({
+            key: 'main-' + String(main.id),
+            kind: 'main',
+            id: main.id,
+            description: main.description,
+            x: mainX,
+            y: mainY,
+            w: mainW,
+            h: mainH,
+            style: {
+                fill: '#4a90d9',
+                stroke: '#1a5fa8',
+                strokeWidth: 3,
+                rx: 4,
+                fontSize: '13px',
+                fontWeight: 'bold'
+            }
+        });
+
+        if (pres.length > 0) {
+            var preStartY = (H - ((pres.length - 1) * ROW_GAP)) / 2;
+            pres.forEach(function(p, i) {
+                var preNode = addNode({
+                    key: 'pre-' + String(p.id),
+                    kind: 'pre',
+                    id: p.id,
+                    description: p.description,
+                    x: leftX,
+                    y: preStartY + (i * ROW_GAP),
+                    w: preW,
+                    h: preH,
+                    style: {
+                        fill: '#f0ad4e',
+                        stroke: '#c87f0a',
+                        strokeWidth: 1.5,
+                        rx: 3,
+                        fontSize: '11px',
+                        fontWeight: 'normal'
+                    }
+                });
+                edges.push({
+                    source: preNode,
+                    target: mainNode,
+                    dashed: true,
+                    relationText: M.util.get_string('relation_prerequisite', 'block_blumod')
+                });
+            });
+        }
+
+        if (subs.length > 0) {
+            var subStartY = (H - ((subs.length - 1) * ROW_GAP)) / 2;
+            subs.forEach(function(s, i) {
+                var subNode = addNode({
+                    key: 'sub-' + String(s.id),
+                    kind: 'sub',
+                    id: s.id,
+                    description: s.description,
+                    x: rightX,
+                    y: subStartY + (i * ROW_GAP),
+                    w: subW,
+                    h: subH,
+                    style: {
+                        fill: '#5cb85c',
+                        stroke: '#3d8b3d',
+                        strokeWidth: 1.5,
+                        rx: 3,
+                        fontSize: '11px',
+                        fontWeight: 'normal'
+                    }
+                });
+                edges.push({
+                    source: mainNode,
+                    target: subNode,
+                    dashed: false,
+                    relationText: M.util.get_string('relation_composedof', 'block_blumod')
+                });
+            });
+        }
+
+        function edgeStart(fromNode, toNode) {
+            return {
+                x: fromNode.x + (toNode.x >= fromNode.x ? (fromNode.w / 2 + EDGE_PAD) : -(fromNode.w / 2 + EDGE_PAD)),
+                y: fromNode.y
+            };
+        }
+
+        function edgeEnd(fromNode, toNode) {
+            return {
+                x: toNode.x + (toNode.x >= fromNode.x ? -(toNode.w / 2 + EDGE_PAD) : (toNode.w / 2 + EDGE_PAD)),
+                y: toNode.y
+            };
+        }
+
+        function edgeLabelPos(edge) {
+            var start = edgeStart(edge.source, edge.target);
+            var end = edgeEnd(edge.source, edge.target);
+            return {
+                x: (start.x + end.x) / 2,
+                y: (start.y + end.y) / 2 - 6
+            };
+        }
+
         var svg = d3.select(container).append('svg')
             .attr('width', W)
             .attr('height', H)
             .style('display', 'block');
+
+        var gEdges = svg.append('g').attr('class', 'blu-edges');
+        var gNodes = svg.append('g').attr('class', 'blu-nodes');
 
         // Arrowhead marker
         svg.append('defs').append('marker')
@@ -113,100 +218,96 @@ define('block_blumod/blu_graph', [], function() {
             .attr('d', 'M0,-5L10,0L0,5')
             .attr('fill', '#555');
 
-        // --- Prerequisite rects (left column) pre → main ---
-        if (pres.length > 0) {
-            var preStartY = (H - ((pres.length - 1) * ROW_GAP)) / 2;
-            pres.forEach(function(p, i) {
-                var cx = leftX;
-                var cy = preStartY + (i * ROW_GAP);
-                svg.append('line')
-                    .attr('x1', cx)
-                    .attr('y1', cy)
-                    .attr('x2', mainX - mainW / 2 - 5)
-                    .attr('y2', mainY)
-                    .attr('stroke', '#555')
-                    .attr('stroke-width', 1.5)
-                    .attr('stroke-dasharray', '6,3')
-                    .attr('marker-end', 'url(#blu-arr)');
-                svg.append('rect')
-                    .attr('x', cx - preW / 2)
-                    .attr('y', cy - preH / 2)
-                    .attr('width', preW)
-                    .attr('height', preH)
-                    .attr('fill', '#f0ad4e')
-                    .attr('stroke', '#c87f0a')
-                    .attr('stroke-width', 1.5)
-                    .attr('rx', 3);
-                svg.append('text')
-                    .attr('x', cx).attr('y', cy)
-                    .attr('text-anchor', 'middle')
-                    .attr('dominant-baseline', 'middle')
-                    .attr('fill', '#fff')
-                    .attr('font-size', '11px')
-                    .text(fitTextToWidth(p.description, preW - 14));
-            });
-        }
+        var edgeLines = gEdges.selectAll('line')
+            .data(edges)
+            .enter()
+            .append('line')
+            .attr('stroke', '#555')
+            .attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', function(e) { return e.dashed ? '6,3' : null; })
+            .attr('marker-end', 'url(#blu-arr)');
 
-        // --- Main BLU: double-outline rect (blue) ---
-        svg.append('rect')
-            .attr('x', mainX - mainW / 2 - 5)
-            .attr('y', mainY - mainH / 2 - 5)
-            .attr('width', mainW + 10)
-            .attr('height', mainH + 10)
-            .attr('fill', 'none')
-            .attr('stroke', '#1a5fa8')
-            .attr('stroke-width', 2)
-            .attr('rx', 4);
-        svg.append('rect')
-            .attr('x', mainX - mainW / 2)
-            .attr('y', mainY - mainH / 2)
-            .attr('width', mainW)
-            .attr('height', mainH)
-            .attr('fill', '#4a90d9')
-            .attr('stroke', '#1a5fa8')
-            .attr('stroke-width', 2)
-            .attr('rx', 4);
-        svg.append('text')
-            .attr('x', mainX).attr('y', mainY)
+        var edgeLabels = gEdges.selectAll('text.blu-edge-label')
+            .data(edges)
+            .enter()
+            .append('text')
+            .attr('class', 'blu-edge-label')
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'middle')
+            .attr('fill', '#555')
+            .attr('font-size', '11px')
+            .attr('font-weight', 'normal')
+            .text(function(e) { return e.relationText; });
+
+        var nodeGroups = gNodes.selectAll('g.blu-node')
+            .data(nodes)
+            .enter()
+            .append('g')
+            .attr('class', function(n) { return 'blu-node blu-node-' + n.kind; });
+
+        nodeGroups.append('rect')
+            .attr('x', function(n) { return -n.w / 2; })
+            .attr('y', function(n) { return -n.h / 2; })
+            .attr('width', function(n) { return n.w; })
+            .attr('height', function(n) { return n.h; })
+            .attr('fill', function(n) { return n.style.fill; })
+            .attr('stroke', function(n) { return n.style.stroke; })
+            .attr('stroke-width', function(n) { return n.style.strokeWidth; })
+            .attr('rx', function(n) { return n.style.rx; });
+
+        nodeGroups.append('text')
+            .attr('x', 0)
+            .attr('y', 0)
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'middle')
             .attr('fill', '#fff')
-            .attr('font-size', '13px')
-            .attr('font-weight', 'bold')
-            .text(fitTextToWidth(main.description, mainW - 16));
+            .attr('font-size', function(n) { return n.style.fontSize; })
+            .attr('font-weight', function(n) { return n.style.fontWeight; })
+            .text(function(n) { return fitTextToWidth(n.description, n.w - 14); });
 
-        // --- Sub rects (right column) main → sub ---
-        if (subs.length > 0) {
-            var subStartY = (H - ((subs.length - 1) * ROW_GAP)) / 2;
-            subs.forEach(function(s, i) {
-                var sx = rightX;
-                var sy = subStartY + (i * ROW_GAP);
-                svg.append('line')
-                    .attr('x1', mainX + mainW / 2 + 5)
-                    .attr('y1', mainY)
-                    .attr('x2', sx - subW / 2 - 4)
-                    .attr('y2', sy)
-                    .attr('stroke', '#555')
-                    .attr('stroke-width', 1.5)
-                    .attr('marker-end', 'url(#blu-arr)');
-                svg.append('rect')
-                    .attr('x', sx - subW / 2)
-                    .attr('y', sy - subH / 2)
-                    .attr('width', subW)
-                    .attr('height', subH)
-                    .attr('fill', '#5cb85c')
-                    .attr('stroke', '#3d8b3d')
-                    .attr('stroke-width', 1.5)
-                    .attr('rx', 3);
-                svg.append('text')
-                    .attr('x', sx).attr('y', sy)
-                    .attr('text-anchor', 'middle')
-                    .attr('dominant-baseline', 'middle')
-                    .attr('fill', '#fff')
-                    .attr('font-size', '11px')
-                    .text(fitTextToWidth(s.description, subW - 14));
-            });
+        nodeGroups.append('title')
+            .text(function(n) { return String(n.description || ''); });
+
+        function updateGraph() {
+            edgeLines
+                .attr('x1', function(e) { return edgeStart(e.source, e.target).x; })
+                .attr('y1', function(e) { return edgeStart(e.source, e.target).y; })
+                .attr('x2', function(e) { return edgeEnd(e.source, e.target).x; })
+                .attr('y2', function(e) { return edgeEnd(e.source, e.target).y; });
+
+            edgeLabels
+                .attr('x', function(e) { return edgeLabelPos(e).x; })
+                .attr('y', function(e) { return edgeLabelPos(e).y; });
+
+            nodeGroups
+                .attr('transform', function(n) { return 'translate(' + n.x + ',' + n.y + ')'; });
         }
+
+        function clamp(v, min, max) {
+            return Math.max(min, Math.min(max, v));
+        }
+
+        nodeGroups.call(
+            d3.drag()
+                .subject(function(_, n) {
+                    return n;
+                })
+                .on('start', function(_, n) {
+                    d3.select(this).raise();
+                    n.dragging = true;
+                })
+                .on('drag', function(event, n) {
+                    n.x = clamp(event.x, n.w / 2, W - n.w / 2);
+                    n.y = clamp(event.y, n.h / 2, H - n.h / 2);
+                    updateGraph();
+                })
+                .on('end', function(_, n) {
+                    n.dragging = false;
+                    updateGraph();
+                })
+        );
+
+        updateGraph();
     }
 
     function fitTextToWidth(str, maxWidth) {
