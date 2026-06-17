@@ -63,20 +63,34 @@ git clone https://github.com/DesarrollosGalan/moodle_blumod.git
 git checkout MOODLE_NNN_STABLE
 ```
 
+Dejar los permisos adecuados:
+
+```
+chown -R www-data:www-data <YOUR_LOCAL_MOODLE_FOLDER>
+find <YOUR_LOCAL_MOODLE_FOLDER> -type d -exec chmod 0755 {} \;
+find <YOUR_LOCAL_MOODLE_FOLDER> -type f -exec chmod 0644 {} \;
+```
+
 ### Actualizar a un versión de Moodle superior, tanto *minor* como *major*
 
-Descargar los cambios
+Descargar los cambios:
 
 ```
 cd <YOUR_LOCAL_MOODLE_FOLDER>
 git pull origin MOODLE_NNN_STABLE
 ```
 
-, y su hubiera conflictos
+Si hubiera conflictos:
 
 ```
 cd <YOUR_LOCAL_MOODLE_FOLDER>
 git merge -X theirs origin/MOODLE_NNN_STABLE
+```
+
+Dejar los permisos adecuados:
+
+```
+chown -R www-data:www-data <YOUR_LOCAL_MOODLE_FOLDER>
 ```
 
 Con estos pasos ya se puede entrar en la interfaz y seguir las indicaciones que proponga la interfaz.

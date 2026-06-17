@@ -23,9 +23,9 @@ class blu_selector {
     public function display () {
         $name = "bluselector";
         $multiselect = 'multiple="multiple" ';
-        $output = '<div class="userselector" id="' . $this->name . '_wrapper">' . "\n" .
+        $output = '<div class="userselector" id="' . $this->name . '_wrapper" style="width:100%;">' . "\n" .
             '<select name="' . $name . '" id="' . $this->name . '" ' .
-            $multiselect . 'size="' . $this->rows . '" class="form-control no-overflow">' . "\n";
+            $multiselect . 'size="' . $this->rows . '" class="form-control no-overflow" style="width:100%;">' . "\n";
         $blus = $this->get_blus();
         foreach ($blus as $blu) {
             $output .= "<option value='{$blu->id}'>{$blu->description}</option>";
