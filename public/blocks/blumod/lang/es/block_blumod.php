@@ -35,3 +35,5 @@ $string['availablecompetencies'] = 'Competencias disponibles';
 $string['assignedcompetencies'] = 'Competencias asignadas';
 $string['searchcompetencies'] = 'Buscar competencias';
 $string['searchcompetenciesplaceholder'] = 'Escriba al menos 3 caracteres para filtrar las competencias disponibles';
+$string['collapseall'] = 'Contraer todo';
+$string['expandall'] = 'Expandir todo';
