@@ -45,7 +45,14 @@ define('block_blumod/assign_competencies', [], function() {
             return;
         }
 
-        if (isFrameworkOption(control.value)) {
+        const selectedOption = control.options && control.selectedIndex >= 0
+            ? control.options[control.selectedIndex]
+            : null;
+        if (!selectedOption) {
+            return;
+        }
+
+        if (!isActionableOption(selectedOption)) {
             return;
         }
 
@@ -117,6 +124,13 @@ define('block_blumod/assign_competencies', [], function() {
                 option.hidden = false;
                 return;
             }
+
+            // Keep hierarchy context rows visible while filtering.
+            if (option.disabled) {
+                option.hidden = false;
+                return;
+            }
+
             if (!doFilter) {
                 option.hidden = false;
                 return;
@@ -127,6 +141,18 @@ define('block_blumod/assign_competencies', [], function() {
 
     function isFrameworkOption(value) {
         return typeof value === 'string' && value.indexOf('F') === 0;
+    }
+
+    function isActionableOption(option) {
+        if (!option || option.disabled) {
+            return false;
+        }
+
+        if (isFrameworkOption(option.value)) {
+            return false;
+        }
+
+        return /^[0-9]+$/.test(option.value);
     }
 
     return {
