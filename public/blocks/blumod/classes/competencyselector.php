@@ -284,8 +284,10 @@ class competency_selector {
             }
 
             $competency = $node->competency;
-            $competencyid = (int)$competency->get('id');
-            $shortname = (string)$competency->get('shortname');
+            // $competencyid = (int)$competency->get('id');
+            // $shortname = (string)$competency->get('shortname');
+            $competencyid = (int)$competency->id;
+            $shortname = (string)$competency->shortname;
             $children = empty($node->children) ? [] : $node->children;
             $isleaf = empty($children);
 
