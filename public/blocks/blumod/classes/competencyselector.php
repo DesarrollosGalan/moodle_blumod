@@ -103,6 +103,11 @@ class competency_selector {
         ]);
         $output .= html_writer::end_tag('div');
 
+        $output .= html_writer::start_div('mb-2');
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="collapse-available"><i class="fa fa-compress"></i> '. get_string('collapseall', 'block_blumod') . '</button>';
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="expand-available"><i class="fa fa-expand"></i> '. get_string('expandall', 'block_blumod') . '</button>';
+        $output .= html_writer::end_tag('div');
+
         $output .= $this->displaySelect($availableid, $available);
         $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
 
@@ -178,6 +183,10 @@ class competency_selector {
                 'value' => 'F' . $frameworkid,
                 'label' => '▼ ' . ($frameworkname !== '' ? $frameworkname : ('Framework ' . $frameworkid)),
                 'selectable' => false,
+                'rowtype' => 'framework',
+                'frameworkid' => $frameworkid,
+                'level' => 0,
+                'isleaf' => false,
             ];
 
             $frameworktree = competency::get_framework_tree((int)$frameworkid);
@@ -217,6 +226,10 @@ class competency_selector {
                 'value' => (string)$competencyid,
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isleaf,
+                'rowtype' => 'competency',
+                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'level' => $level,
+                'isleaf' => $isleaf,
             ];
 
             if (!$isleaf) {
@@ -249,6 +262,10 @@ class competency_selector {
                 'value' => 'F' . $frameworkid,
                 'label' => '▼ ' . ($frameworkname !== '' ? $frameworkname : ('Framework ' . $frameworkid)),
                 'selectable' => false,
+                'rowtype' => 'framework',
+                'frameworkid' => $frameworkid,
+                'level' => 0,
+                'isleaf' => false,
             ];
 
             $assigned = array_merge($assigned, $branchoptions);
@@ -288,6 +305,10 @@ class competency_selector {
                 'value' => $isassignedleaf ? (string)$competencyid : 'C' . $competencyid,
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isassignedleaf,
+                'rowtype' => 'competency',
+                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'level' => $level,
+                'isleaf' => $isleaf,
             ];
 
             if (!empty($childoptions)) {
@@ -304,12 +325,32 @@ class competency_selector {
         $output = '<select name="' . $name . '" id="' . $name . '" ' .
             ($multiselect ? 'multiple="multiple" ' . 'size="' . $this->rows . '"' : '') . ' class="form-control no-overflow">' . "\n";
 
+        $isavailableselect = ($name === $this->name . '_available');
+
         foreach ($data as $option) {
             $value = s((string)$option['value']);
             $label = s((string)$option['label']);
             $attrs = " value=\"{$value}\"";
 
-            if (empty($option['selectable'])) {
+            if (isset($option['rowtype'])) {
+                $attrs .= ' data-rowtype="' . s((string)$option['rowtype']) . '"';
+            }
+
+            if (isset($option['frameworkid'])) {
+                $attrs .= ' data-frameworkid="' . (int)$option['frameworkid'] . '"';
+            }
+
+            if (isset($option['level'])) {
+                $attrs .= ' data-level="' . (int)$option['level'] . '"';
+            }
+
+            if (isset($option['isleaf'])) {
+                $attrs .= ' data-isleaf="' . ($option['isleaf'] ? '1' : '0') . '"';
+            }
+
+            $attrs .= ' data-selectable="' . (!empty($option['selectable']) ? '1' : '0') . '"';
+
+            if (empty($option['selectable']) && !$isavailableselect) {
                 $attrs .= ' disabled="disabled"';
             }
 

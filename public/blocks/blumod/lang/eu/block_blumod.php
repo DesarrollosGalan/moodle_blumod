@@ -35,3 +35,5 @@ $string['availablecompetencies'] = 'Konpetentzia eskuragarriak';
 $string['assignedcompetencies'] = 'Konpetentzia esleituak';
 $string['searchcompetencies'] = 'Bilatu konpetentziak';
 $string['searchcompetenciesplaceholder'] = 'Idatzi gutxienez 3 karaktere konpetentzia eskuragarriak filtratzeko';
+$string['collapseall'] = 'Konprimitu guztia';
+$string['expandall'] = 'Zabaldu guztia';
