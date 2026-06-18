@@ -52,9 +52,14 @@ $PAGE->set_title($title);
 $PAGE->set_heading($course->fullname);
 $PAGE->set_pagelayout('standard');
 
-$PAGE->navbar->add(get_string('managerblumod', 'block_blumod'));
+$PAGE->navbar->add(get_string('mapblumod', 'block_blumod'));
 
 echo $OUTPUT->header();
+
+echo html_writer::start_tag('div');
+echo html_writer::tag('h5', get_string('mapblumod', 'block_blumod'));
+echo html_writer::end_tag('div');
+
 
 // Selector BLUs
 echo html_writer::start_tag('div');

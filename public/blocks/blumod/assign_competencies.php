@@ -59,18 +59,16 @@ $PAGE->navbar->add(get_string('assigncompetencies', 'block_blumod'));
 echo $OUTPUT->header();
 // xdebug_break();
 // Selector BLUs
+
+echo html_writer::start_tag('div');
+echo html_writer::tag('h5', get_string('assigncompetencies', 'block_blumod'));
+echo html_writer::end_tag('div');
+
 echo html_writer::start_tag('div');
 echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
 $blu_selector = new blu_selector($courseid);
 echo $blu_selector->display();
 echo html_writer::end_tag('div');
-
-// Selector BLU Competencies
-// echo html_writer::start_tag('div');
-// echo html_writer::tag('h2', get_string('blus', 'block_blumod'));
-// $competency_selector = new competency_selector($courseid);
-// echo $competency_selector->display();
-// echo html_writer::end_tag('div');
 
 echo html_writer::start_tag('div', ['id' => 'competencies']);
 
