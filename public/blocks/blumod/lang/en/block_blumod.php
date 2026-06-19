@@ -30,11 +30,15 @@ $string['assignedresources'] = 'Assigned Resources';
 $string['searchresources'] = 'Search resources';
 $string['searchresourcesplaceholder'] = 'Type at least 3 characters to filter available resources';
 $string['reportblumod'] = 'Export BLUs';
-$string['assigncompetencies'] = 'Assign competencies to BLUs';
+$string['assigncompetencies'] = 'Assign competencies to BLU';
 $string['availablecompetencies'] = 'Available Competencies';
 $string['searchcompetencies'] = 'Search available competencies';
 $string['searchcompetenciesplaceholder'] = 'Type at least 3 characters to filter available competencies';
 
 $string['assignedcompetencies'] = 'Assigned Competencies';
+$string['assignedblus'] = 'Assigned BLUs';
+$string['allblus'] = 'All the BLUs';
 $string['collapseall'] = 'Collapse all';
 $string['expandall'] = 'Expand all';
+$string['assignblusresource'] = 'Assign BLUs to resource';
+$string['resourcesincourse'] = 'Resources in course';
