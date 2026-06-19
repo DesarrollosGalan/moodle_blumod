@@ -24,6 +24,9 @@ class competency_selector {
     /** @var array */
     private $childrenbyparent = [];
 
+    /** @var array */
+    private $treesbyframework = [];
+
     private $name = 'competencyselector';
     private $rows = 10;    
 
@@ -157,6 +160,7 @@ class competency_selector {
             $this->competencies[$result->id] = (object)[
                 'id' => (int)$result->id,
                 'frameworkid' => $frameworkid,
+                'competencyframeworkid' => $frameworkid,
                 'frameworkname' => $this->frameworks[$frameworkid],
                 'shortname' => $result->co_shortname,
                 'parentid' => (int)$result->parentid,
@@ -189,7 +193,7 @@ class competency_selector {
                 'isleaf' => false,
             ];
 
-            $frameworktree = competency::get_framework_tree((int)$frameworkid);
+            $frameworktree = $this->get_framework_tree((int)$frameworkid);
             if (empty($frameworktree)) {
                 continue;
             }
@@ -213,8 +217,8 @@ class competency_selector {
             }
 
             $competency = $node->competency;
-            $competencyid = (int)$competency->get('id');
-            $shortname = (string)$competency->get('shortname');
+            $competencyid = (int)$this->competency_value($competency, 'id');
+            $shortname = (string)$this->competency_value($competency, 'shortname');
             $children = empty($node->children) ? [] : $node->children;
             $isleaf = empty($children);
 
@@ -227,7 +231,7 @@ class competency_selector {
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isleaf,
                 'rowtype' => 'competency',
-                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'frameworkid' => (int)$this->competency_value($competency, 'competencyframeworkid'),
                 'level' => $level,
                 'isleaf' => $isleaf,
             ];
@@ -248,7 +252,7 @@ class competency_selector {
         $assigned = [];
 
         foreach ($this->frameworks as $frameworkid => $frameworkname) {
-            $frameworktree = competency::get_framework_tree((int)$frameworkid);
+            $frameworktree = $this->get_framework_tree((int)$frameworkid);
             if (empty($frameworktree)) {
                 continue;
             }
@@ -284,10 +288,8 @@ class competency_selector {
             }
 
             $competency = $node->competency;
-            $competencyid = (int)$competency->get('id');
-            $shortname = (string)$competency->get('shortname');
-            // $competencyid = (int)$competency->id;
-            // $shortname = (string)$competency->shortname;
+            $competencyid = (int)$this->competency_value($competency, 'id');
+            $shortname = (string)$this->competency_value($competency, 'shortname');
             $children = empty($node->children) ? [] : $node->children;
             $isleaf = empty($children);
 
@@ -308,7 +310,7 @@ class competency_selector {
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isassignedleaf,
                 'rowtype' => 'competency',
-                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'frameworkid' => (int)$this->competency_value($competency, 'competencyframeworkid'),
                 'level' => $level,
                 'isleaf' => $isleaf,
             ];
@@ -436,6 +438,71 @@ class competency_selector {
     private function framework_label(string $frameworkname, string $label): string
     {
         return $frameworkname . ': ' . $label;
+    }
+
+    /**
+     * Get the tree for a framework from the request-local index.
+     *
+     * @param int $frameworkid
+     * @return array
+     */
+    private function get_framework_tree(int $frameworkid): array
+    {
+        if (!array_key_exists($frameworkid, $this->treesbyframework)) {
+            $this->treesbyframework[$frameworkid] = $this->build_tree_from_index(0, $frameworkid);
+        }
+
+        return $this->treesbyframework[$frameworkid];
+    }
+
+    /**
+     * Build a nested competency tree using the local parent index.
+     *
+     * @param int $parentid
+     * @param int $frameworkid
+     * @return array
+     */
+    private function build_tree_from_index(int $parentid, int $frameworkid): array
+    {
+        $tree = [];
+
+        if (empty($this->childrenbyparent[$parentid])) {
+            return $tree;
+        }
+
+        foreach ($this->childrenbyparent[$parentid] as $childid) {
+            if (!isset($this->competencies[$childid])) {
+                continue;
+            }
+
+            $competency = $this->competencies[$childid];
+            if ((int)$competency->frameworkid !== $frameworkid) {
+                continue;
+            }
+
+            $node = new stdClass();
+            $node->competency = $competency;
+            $node->children = $this->build_tree_from_index($childid, $frameworkid);
+            $tree[] = $node;
+        }
+
+        return $tree;
+    }
+
+    /**
+     * Read a competency value regardless of whether it is a persistent object or a plain record.
+     *
+     * @param object $competency
+     * @param string $field
+     * @return mixed
+     */
+    private function competency_value(object $competency, string $field)
+    {
+        if (method_exists($competency, 'get')) {
+            return $competency->get($field);
+        }
+
+        return $competency->$field ?? null;
     }
     
 }

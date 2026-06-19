@@ -164,9 +164,7 @@ define('block_blumod/assign_competencies', [], function() {
             }
 
             let baseHidden = false;
-            if (isCollapsed) {
-                baseHidden = rowtype !== 'framework';
-            } else if (collapsedParents.length > 0 && rowtype !== 'framework') {
+            if (collapsedParents.length > 0 && rowtype !== 'framework') {
                 baseHidden = true;
             }
 
@@ -249,6 +247,9 @@ define('block_blumod/assign_competencies', [], function() {
         availableSelect.dataset.treeState = 'collapsed';
 
         Array.prototype.forEach.call(availableSelect.options, function(option) {
+            if (isCollapsibleRow(option)) {
+                option.setAttribute('data-node-collapsed', '1');
+            }
             const rowtype = option.getAttribute('data-rowtype');
             option.hidden = rowtype !== 'framework';
         });
@@ -307,14 +308,10 @@ define('block_blumod/assign_competencies', [], function() {
             return;
         }
 
-        const wasGloballyCollapsed = select.dataset.treeState === 'collapsed';
         const currentlyCollapsed = parent.getAttribute('data-node-collapsed') === '1';
         const shouldForceExpand = forceExpand === true;
 
-        if (wasGloballyCollapsed) {
-            select.dataset.treeState = 'expanded';
-            parent.setAttribute('data-node-collapsed', '0');
-        } else if (shouldForceExpand) {
+        if (shouldForceExpand) {
             parent.setAttribute('data-node-collapsed', '0');
         } else {
             parent.setAttribute('data-node-collapsed', currentlyCollapsed ? '0' : '1');
