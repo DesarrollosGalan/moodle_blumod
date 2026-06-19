@@ -24,8 +24,11 @@ class competency_selector {
     /** @var array */
     private $childrenbyparent = [];
 
+    /** @var array */
+    private $treesbyframework = [];
+
     private $name = 'competencyselector';
-    private $rows = 10;    
+    private $rows = 30;
 
     public function __construct(int $courseid, ?int $bluid = null) {
         $this->courseid = $courseid;
@@ -86,36 +89,63 @@ class competency_selector {
         $available = $this->availableCompetencies($assignedleafids);
         $assigned = $this->assignedCompetencies($assignedleafids);
 
-        $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector' ]);
-        $output .= html_writer::tag('h2', get_string('availablecompetencies', 'block_blumod'));
-
         $searchid = $this->name . '_search';
-        $availableid = $this->name . '_available';        
-        $output .= html_writer::start_div('mb-2');
+        $availableid = $this->name . '_available';
+
+        $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector']);
+
+        // Row 1a: Search box (left) / empty (right) — above titles.
+        $output .= html_writer::start_div('row mb-2');
+        $output .= html_writer::start_div('col-md-6');
         $output .= html_writer::label(get_string('searchcompetencies', 'block_blumod'), $searchid, false, ['class' => 'form-label']);
         $output .= html_writer::empty_tag('input', [
             'type' => 'text',
-            'id' => $searchid,            
+            'id' => $searchid,
             'class' => 'form-control',
             'value' => '',
             'placeholder' => get_string('searchcompetenciesplaceholder', 'block_blumod'),
             'autocomplete' => 'off'
         ]);
-        $output .= html_writer::end_tag('div');
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1a
 
-        $output .= html_writer::start_div('mb-2');
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="collapse-available"><i class="fa fa-compress"></i> '. get_string('collapseall', 'block_blumod') . '</button>';
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="expand-available"><i class="fa fa-expand"></i> '. get_string('expandall', 'block_blumod') . '</button>';
-        $output .= html_writer::end_tag('div');
-
-        $output .= $this->displaySelect($availableid, $available);
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
-
+        // Row 1b: Available heading (left) / Assigned heading (right) — horizontally aligned.
+        $output .= html_writer::start_div('row');
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::tag('h2', get_string('availablecompetencies', 'block_blumod'));
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
         $output .= html_writer::tag('h2', get_string('assignedcompetencies', 'block_blumod'));
-        $output .= $this->displaySelect($this->name. '_assigned', $assigned);
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name. '_assigned"><i class="fa fa-unlink"></i> '. get_string('delblu', 'block_blumod') . '</button>';
-        
-        $output .= html_writer::end_tag('div');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1b
+
+        // Row 1c: Collapse/Expand buttons (left) / empty (right).
+        $output .= html_writer::start_div('row mb-2');
+        $output .= html_writer::start_div('col-md-6');
+        $output .= '<button class="btn btn-secondary btn-secondary-blu me-2" data-action="collapse-available"><i class="fa fa-compress"></i> ' . get_string('collapseall', 'block_blumod') . '</button>';
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="expand-available"><i class="fa fa-expand"></i> ' . get_string('expandall', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1c
+
+        // Row 2: selects and action buttons, both aligned at the same top.
+        $output .= html_writer::start_div('row');
+
+        $output .= html_writer::start_div('col-md-6');
+        $output .= $this->displaySelect($availableid, $available);
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name . '_available"><i class="fa fa-link"></i> ' . get_string('addblu', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div(); // col-md-6 left select
+
+        $output .= html_writer::start_div('col-md-6');
+        $output .= $this->displaySelect($this->name . '_assigned', $assigned);
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name . '_assigned"><i class="fa fa-unlink"></i> ' . get_string('delblu', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div(); // col-md-6 right select
+
+        $output .= html_writer::end_div(); // row 2
+        $output .= html_writer::end_tag('div'); // wrapper
 
         return $output;
 
@@ -157,6 +187,7 @@ class competency_selector {
             $this->competencies[$result->id] = (object)[
                 'id' => (int)$result->id,
                 'frameworkid' => $frameworkid,
+                'competencyframeworkid' => $frameworkid,
                 'frameworkname' => $this->frameworks[$frameworkid],
                 'shortname' => $result->co_shortname,
                 'parentid' => (int)$result->parentid,
@@ -189,7 +220,7 @@ class competency_selector {
                 'isleaf' => false,
             ];
 
-            $frameworktree = competency::get_framework_tree((int)$frameworkid);
+            $frameworktree = $this->get_framework_tree((int)$frameworkid);
             if (empty($frameworktree)) {
                 continue;
             }
@@ -213,8 +244,8 @@ class competency_selector {
             }
 
             $competency = $node->competency;
-            $competencyid = (int)$competency->get('id');
-            $shortname = (string)$competency->get('shortname');
+            $competencyid = (int)$this->competency_value($competency, 'id');
+            $shortname = (string)$this->competency_value($competency, 'shortname');
             $children = empty($node->children) ? [] : $node->children;
             $isleaf = empty($children);
 
@@ -227,7 +258,7 @@ class competency_selector {
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isleaf,
                 'rowtype' => 'competency',
-                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'frameworkid' => (int)$this->competency_value($competency, 'competencyframeworkid'),
                 'level' => $level,
                 'isleaf' => $isleaf,
             ];
@@ -248,7 +279,7 @@ class competency_selector {
         $assigned = [];
 
         foreach ($this->frameworks as $frameworkid => $frameworkname) {
-            $frameworktree = competency::get_framework_tree((int)$frameworkid);
+            $frameworktree = $this->get_framework_tree((int)$frameworkid);
             if (empty($frameworktree)) {
                 continue;
             }
@@ -284,8 +315,8 @@ class competency_selector {
             }
 
             $competency = $node->competency;
-            $competencyid = (int)$competency->get('id');
-            $shortname = (string)$competency->get('shortname');
+            $competencyid = (int)$this->competency_value($competency, 'id');
+            $shortname = (string)$this->competency_value($competency, 'shortname');
             $children = empty($node->children) ? [] : $node->children;
             $isleaf = empty($children);
 
@@ -306,7 +337,7 @@ class competency_selector {
                 'label' => $this->build_indented_label($shortname, $level, $isleaf),
                 'selectable' => $isassignedleaf,
                 'rowtype' => 'competency',
-                'frameworkid' => (int)$competency->get('competencyframeworkid'),
+                'frameworkid' => (int)$this->competency_value($competency, 'competencyframeworkid'),
                 'level' => $level,
                 'isleaf' => $isleaf,
             ];
@@ -434,6 +465,71 @@ class competency_selector {
     private function framework_label(string $frameworkname, string $label): string
     {
         return $frameworkname . ': ' . $label;
+    }
+
+    /**
+     * Get the tree for a framework from the request-local index.
+     *
+     * @param int $frameworkid
+     * @return array
+     */
+    private function get_framework_tree(int $frameworkid): array
+    {
+        if (!array_key_exists($frameworkid, $this->treesbyframework)) {
+            $this->treesbyframework[$frameworkid] = $this->build_tree_from_index(0, $frameworkid);
+        }
+
+        return $this->treesbyframework[$frameworkid];
+    }
+
+    /**
+     * Build a nested competency tree using the local parent index.
+     *
+     * @param int $parentid
+     * @param int $frameworkid
+     * @return array
+     */
+    private function build_tree_from_index(int $parentid, int $frameworkid): array
+    {
+        $tree = [];
+
+        if (empty($this->childrenbyparent[$parentid])) {
+            return $tree;
+        }
+
+        foreach ($this->childrenbyparent[$parentid] as $childid) {
+            if (!isset($this->competencies[$childid])) {
+                continue;
+            }
+
+            $competency = $this->competencies[$childid];
+            if ((int)$competency->frameworkid !== $frameworkid) {
+                continue;
+            }
+
+            $node = new stdClass();
+            $node->competency = $competency;
+            $node->children = $this->build_tree_from_index($childid, $frameworkid);
+            $tree[] = $node;
+        }
+
+        return $tree;
+    }
+
+    /**
+     * Read a competency value regardless of whether it is a persistent object or a plain record.
+     *
+     * @param object $competency
+     * @param string $field
+     * @return mixed
+     */
+    private function competency_value(object $competency, string $field)
+    {
+        if (method_exists($competency, 'get')) {
+            return $competency->get($field);
+        }
+
+        return $competency->$field ?? null;
     }
     
 }

@@ -32,7 +32,7 @@ $string['searchresourcesplaceholder'] = 'Type at least 3 characters to filter av
 $string['reportblumod'] = 'Export BLUs';
 $string['assigncompetencies'] = 'Assign competencies to BLUs';
 $string['availablecompetencies'] = 'Available Competencies';
-$string['searchcompetencies'] = 'Search competencies';
+$string['searchcompetencies'] = 'Search available competencies';
 $string['searchcompetenciesplaceholder'] = 'Type at least 3 characters to filter available competencies';
 
 $string['assignedcompetencies'] = 'Assigned Competencies';
