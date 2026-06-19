@@ -28,7 +28,7 @@ class competency_selector {
     private $treesbyframework = [];
 
     private $name = 'competencyselector';
-    private $rows = 10;    
+    private $rows = 30;
 
     public function __construct(int $courseid, ?int $bluid = null) {
         $this->courseid = $courseid;
@@ -89,36 +89,63 @@ class competency_selector {
         $available = $this->availableCompetencies($assignedleafids);
         $assigned = $this->assignedCompetencies($assignedleafids);
 
-        $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector' ]);
-        $output .= html_writer::tag('h2', get_string('availablecompetencies', 'block_blumod'));
-
         $searchid = $this->name . '_search';
-        $availableid = $this->name . '_available';        
-        $output .= html_writer::start_div('mb-2');
+        $availableid = $this->name . '_available';
+
+        $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector']);
+
+        // Row 1a: Search box (left) / empty (right) — above titles.
+        $output .= html_writer::start_div('row mb-2');
+        $output .= html_writer::start_div('col-md-6');
         $output .= html_writer::label(get_string('searchcompetencies', 'block_blumod'), $searchid, false, ['class' => 'form-label']);
         $output .= html_writer::empty_tag('input', [
             'type' => 'text',
-            'id' => $searchid,            
+            'id' => $searchid,
             'class' => 'form-control',
             'value' => '',
             'placeholder' => get_string('searchcompetenciesplaceholder', 'block_blumod'),
             'autocomplete' => 'off'
         ]);
-        $output .= html_writer::end_tag('div');
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1a
 
-        $output .= html_writer::start_div('mb-2');
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="collapse-available"><i class="fa fa-compress"></i> '. get_string('collapseall', 'block_blumod') . '</button>';
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="expand-available"><i class="fa fa-expand"></i> '. get_string('expandall', 'block_blumod') . '</button>';
-        $output .= html_writer::end_tag('div');
-
-        $output .= $this->displaySelect($availableid, $available);
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name. '_available"><i class="fa fa-link"></i> '. get_string('addblu', 'block_blumod') . '</button>';
-
+        // Row 1b: Available heading (left) / Assigned heading (right) — horizontally aligned.
+        $output .= html_writer::start_div('row');
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::tag('h2', get_string('availablecompetencies', 'block_blumod'));
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
         $output .= html_writer::tag('h2', get_string('assignedcompetencies', 'block_blumod'));
-        $output .= $this->displaySelect($this->name. '_assigned', $assigned);
-        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name. '_assigned"><i class="fa fa-unlink"></i> '. get_string('delblu', 'block_blumod') . '</button>';
-        
-        $output .= html_writer::end_tag('div');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1b
+
+        // Row 1c: Collapse/Expand buttons (left) / empty (right).
+        $output .= html_writer::start_div('row mb-2');
+        $output .= html_writer::start_div('col-md-6');
+        $output .= '<button class="btn btn-secondary btn-secondary-blu me-2" data-action="collapse-available"><i class="fa fa-compress"></i> ' . get_string('collapseall', 'block_blumod') . '</button>';
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="expand-available"><i class="fa fa-expand"></i> ' . get_string('expandall', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div();
+        $output .= html_writer::start_div('col-md-6');
+        $output .= html_writer::end_div();
+        $output .= html_writer::end_div(); // row 1c
+
+        // Row 2: selects and action buttons, both aligned at the same top.
+        $output .= html_writer::start_div('row');
+
+        $output .= html_writer::start_div('col-md-6');
+        $output .= $this->displaySelect($availableid, $available);
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="add" data-from="' . $this->name . '_available"><i class="fa fa-link"></i> ' . get_string('addblu', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div(); // col-md-6 left select
+
+        $output .= html_writer::start_div('col-md-6');
+        $output .= $this->displaySelect($this->name . '_assigned', $assigned);
+        $output .= '<button class="btn btn-secondary btn-secondary-blu" data-action="del" data-from="' . $this->name . '_assigned"><i class="fa fa-unlink"></i> ' . get_string('delblu', 'block_blumod') . '</button>';
+        $output .= html_writer::end_div(); // col-md-6 right select
+
+        $output .= html_writer::end_div(); // row 2
+        $output .= html_writer::end_tag('div'); // wrapper
 
         return $output;
 
