@@ -17,11 +17,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Configurable Reports
+ * BLU mod block resource assignment page
  * A Moodle block for BLU
  * @package blocks
  * @author: 
- * @date: 2009
+ * @date: 2024
  */
 
 require_once '../../config.php';
@@ -33,7 +33,7 @@ global $DB, $CFG, $PAGE;
 $courseid = required_param('courseid', PARAM_INT);
 
 $course = $DB->get_record('course', ['id'=>$courseid], '*', MUST_EXIST);
-$url = new moodle_url('/block/blumod/assign_resources.php', ['courseid'=>$courseid]);
+$url = new moodle_url('/blocks/blumod/assign_resources.php', ['courseid'=>$courseid]);
 $PAGE->set_url($url);
 require_login($course);
 

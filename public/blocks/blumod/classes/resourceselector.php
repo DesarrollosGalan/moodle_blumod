@@ -83,6 +83,33 @@ class resource_selector {
 
     }
 
+    public function display_available_resources_only(): string
+    {
+        $output = html_writer::start_tag('div', ['id' => $this->name . '_wrapper', 'class' => 'userselector']);
+
+        $searchid = $this->name . '_search';
+        $resourcesid = $this->name . '_resources';
+
+        $output .= html_writer::start_div('mb-2');
+        $output .= html_writer::label(get_string('searchresources', 'block_blumod'), $searchid, false, ['class' => 'form-label']);
+        $output .= html_writer::empty_tag('input', [
+            'type' => 'text',
+            'id' => $searchid,
+            'name' => $searchid,
+            'class' => 'form-control',
+            'value' => '',
+            'placeholder' => get_string('searchresourcesplaceholder', 'block_blumod'),
+            'autocomplete' => 'off'
+        ]);
+        $output .= html_writer::end_div();
+
+        $output .= $this->displaySelect($resourcesid, $this->resources);
+
+        $output .= html_writer::end_tag('div');
+
+        return $output;
+    }
+
     private function loadResources()
     {
         global $DB;
