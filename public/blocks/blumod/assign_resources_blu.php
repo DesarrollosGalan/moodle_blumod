@@ -26,7 +26,7 @@ require_once '../../config.php';
 require_once $CFG->dirroot.'/blocks/blumod/lib.php';
 require_once $CFG->dirroot.'/blocks/blumod/classes/resourceselector.php';
 
-global $DB, $CFG, $PAGE;
+global $DB, $CFG, $PAGE, $OUTPUT;
 
 $courseid = required_param('courseid', PARAM_INT);
 
@@ -37,6 +37,7 @@ require_login($course);
 
 $PAGE->requires->js_call_amd('block_blumod/assign_resources_blu', 'init');
 
+/** @var \context $context */
 $context = context_course::instance($courseid);
 $PAGE->set_context($context);
 
@@ -62,7 +63,7 @@ $resource_selector = new resource_selector($courseid);
 echo $resource_selector->display_available_resources_only();
 echo html_writer::end_tag('div');
 
-echo html_writer::start_tag('div', ['id' => 'blus']);
+echo html_writer::start_tag('div', ['id' => 'blus', 'class' => 'mt-5']);
 
 echo html_writer::end_tag('div');
 
