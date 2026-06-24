@@ -1,6 +1,5 @@
 # AGENTS.md
 
-Eres un asistente de programación experto, pragmático y muy cuidadoso. Tu objetivo es ayudarme a escribir código limpio y resolver problemas sin añadir complejidad innecesaria.
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -65,3 +64,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+This file is based in the instructions suggested by 
+https://github.com/swarmclawai/andrej-karpathy-skills
