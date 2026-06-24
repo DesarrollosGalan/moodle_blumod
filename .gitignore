@@ -62,6 +62,8 @@ UPGRADING-CURRENT.md
 .phpunit.cache
 tsconfig.aliases.json
 .github/
+!/.github/
+!/.github/copilot-instructions.md
 .esbuild/
 .grunt/
 .vscode/

@@ -1,0 +1,1 @@
+# Please read and strictly follow the guidelines defined in the AGENTS.md file at the root of this project.
