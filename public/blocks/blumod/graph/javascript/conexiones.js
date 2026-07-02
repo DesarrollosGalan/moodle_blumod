@@ -24,7 +24,7 @@ function initUI() {
 
     // Validar que los elementos existan
     if (!UI.loadBtn || !UI.querySelect) {
-        console.error('ForjaLens: Elementos del UI no encontrados en el DOM', UI);
+        console.error('Elementos del UI no encontrados en el DOM', UI);
         return false;
     }
 
@@ -38,7 +38,7 @@ const state = {
 };
 
 /**
- * Llama a ajax.php pasando la acción (equivalente al antiguo "endpoint")
+ * Llama a ajax.php pasando la acción 
  * y el courseid actual. sesskey y wwwroot vienen inyectados por view.php
  * en window.FORJALENS.
  */
@@ -99,22 +99,15 @@ function setView(mode, bindings) {
     UI.graphContainer.style.display = 'block';
 
     if (mode === 'obsidian') {
-        // buildObsidianElements(bindings);
         renderObsidianGraph(bindings);
         } else if (mode === 'compound') {
-            // buildCompoundElements(bindings);
             renderCompoundGraph(bindings);
         } else {
-            // buildStandardElements(bindings);
             renderCompoundGraph(bindings);
         }
     }
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
-    // if (initUI()) {
-    //     // Ejecutar la primera consulta automáticamente después de inicializar
-    //     executeQuery();
-    // }
     initUI();
 });

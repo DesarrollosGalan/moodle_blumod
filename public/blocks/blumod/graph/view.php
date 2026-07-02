@@ -1,8 +1,4 @@
 <?php
-/**
- * 
- * 
- */
 
 require_once(__DIR__ . '/../../../../config.php');
 
@@ -25,8 +21,6 @@ $PAGE->requires->js(new moodle_url('https://unpkg.com/dagre@0.8.5/dist/dagre.min
 $PAGE->requires->js(new moodle_url('https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js'), true);
 $PAGE->requires->js(new moodle_url('https://unpkg.com/cytoscape-expand-collapse/cytoscape-expand-collapse.js'), true);
 
-// Assets propios del plugin (copias sin modificar de graph.js / table.js,
-// y conexiones.js adaptado a Moodle).
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/graph.js'), true);
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/table.js'), true);
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/conexiones.js'), true);
@@ -36,7 +30,7 @@ $PAGE->requires->css(new moodle_url('/blocks/blumod/graph/styles.css'));
 echo $OUTPUT->header();
 
 // Se inyectan los parámetros de Moodle que conexiones.js necesita
-// (wwwroot, sesskey, courseid) sin depender de M.cfg si el tema no lo expone.
+// (wwwroot, sesskey, courseid)
 echo html_writer::script('
     window.FORJALENS = {
         wwwroot:  ' . json_encode($CFG->wwwroot) . ',

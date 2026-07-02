@@ -1,6 +1,5 @@
 <?php
 /**
- * Endpoint AJAX de ForjaLens.
  *
  * Uso desde el frontend (ver javascript/conexiones.js):
  *   GET ajax.php?action=course_structure&courseid=123&sesskey=xxxx
@@ -26,10 +25,6 @@ header('Content-Type: application/json; charset=utf-8');
 try {
     switch ($action) {
         case 'get_courses':
-            // Nota: aquí no se filtra por $courseid, se listan todos los
-            // cursos con BLU a los que el usuario tiene acceso; se deja
-            // el parámetro courseid como "curso actual" solo para
-            // mantener la capability check de arriba.
             echo json_encode(repository::get_courses());
             break;
 
