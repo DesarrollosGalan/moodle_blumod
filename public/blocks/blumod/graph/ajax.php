@@ -2,14 +2,14 @@
 /**
  *
  * Uso desde el frontend (ver javascript/conexiones.js):
- *   GET ajax.php?action=course_structure&courseid=123&sesskey=xxxx
+ *   GET ajax.php?action=get_course_structure&courseid=123&sesskey=xxxx
  *
  */
 
 require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/blocks/blumod/graph/classes/repository.php');
 
-use blumod_semanticviews\repository;
+use blumod_graph\repository;
 
 require_login();
 require_sesskey();
@@ -24,24 +24,28 @@ header('Content-Type: application/json; charset=utf-8');
 
 try {
     switch ($action) {
-        case 'get_courses':
-            echo json_encode(repository::get_courses());
+        case 'get_learningunits_without_resources':
+            echo json_encode(repository::get_learningunits_without_resources($courseid));
             break;
 
-        case 'blus_without_components':
-            echo json_encode(repository::blus_without_components($courseid));
+        case 'get_resources_without_learning_units':
+            echo json_encode(repository::get_resources_without_learning_units($courseid));
             break;
 
-        case 'component_blu_relations':
-            echo json_encode(repository::component_blu_relations($courseid));
+        case 'get_resource_learningunit_relations':
+            echo json_encode(repository::get_resource_learningunit_relations($courseid));
             break;
 
-        case 'competency_blu_relations':
-            echo json_encode(repository::competency_blu_relations($courseid));
+        case 'get_assessmentitem_learningunit_relations':
+            echo json_encode(repository::get_assessmentitem_learningunit_relations($courseid));
             break;
 
-        case 'course_structure':
-            echo json_encode(repository::course_structure($courseid));
+        case 'get_learningunit_resource_relations':
+            echo json_encode(repository::get_learningunit_resource_relations($courseid));
+            break;
+        
+        case 'get_course_structure':
+            echo json_encode(repository::get_course_structure($courseid));
             break;
 
         default:

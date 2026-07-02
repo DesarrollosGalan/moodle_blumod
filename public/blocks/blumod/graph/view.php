@@ -45,19 +45,25 @@ echo html_writer::script('
 
 <label for="querySelect"><?php echo get_string('semanticviews_query', 'block_blumod'); ?>:</label>
 <select id="querySelect">
-    <option value="blus_without_components" data-mode="table">
-        Learning Units sin componentes
+    <option value="get_learningunits_without_resources" data-mode="table">
+        Learning Units (BLU) sin recursos
     </option>
-    <option value="component_blu_relations" data-mode="graph">
-        Componentes &rarr; Learning Units
+    <option value="get_resources_without_learning_units" data-mode="table">
+        Recursos sin Learning Units (BLU)
     </option>
-    <option value="competency_blu_relations" data-mode="graph">
-        Competencias &rarr; Learning Units
+    <option value="get_resource_learningunit_relations" data-mode="graph">
+        Recursos &rarr; Learning Units (BLU)
     </option>
-    <option value="course_structure" data-mode="obsidian">
+    <option value="get_assessmentitem_learningunit_relations" data-mode="graph">
+        AssessmentItems &rarr; Learning Units (BLU)
+    </option>
+    <option value="get_learningunit_resource_relations" data-mode="graph">
+        Learning Units (BLU) &rarr; Recursos
+    </option>    
+    <option value="get_course_structure" data-mode="obsidian">
         Course Structure
     </option>
-    <option value="course_structure" data-mode="compound">
+    <option value="get_course_structure" data-mode="compound">
         Course Structure compound
     </option>
 </select>

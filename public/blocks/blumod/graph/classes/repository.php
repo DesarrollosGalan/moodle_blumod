@@ -1,85 +1,13 @@
 <?php
-namespace blumod_semanticviews;
+namespace blumod_graph;
 
 defined('MOODLE_INTERNAL') || die();
-
 class repository {
 
     /**
+     * Query ForjaLens: course_structure()
      */
-    public static function get_courses(): array {
-        global $DB;
-
-        $sql = "SELECT DISTINCT c.id AS course, c.fullname AS name
-                  FROM {course} c
-                  JOIN {block_blu} blu ON blu.course = c.id
-              ORDER BY c.fullname";
-
-        return self::to_bindings($DB->get_records_sql($sql));
-    }
-
-    /**
-     */
-    public static function blus_without_components(int $courseid): array {
-        global $DB;
-
-        $sql = "SELECT blu.id AS bluid, blu.description AS name
-                  FROM {block_blu} blu
-             LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
-                 WHERE blu.course = :courseid
-                   AND bm.id IS NULL
-              ORDER BY blu.description";
-
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
-    }
-
-    /**
-     */
-    public static function component_blu_relations(int $courseid): array {
-        global $DB;
-
-        $sql = "SELECT bm.id AS relid,
-                       blu.id AS target,
-                       blu.description AS targetLabel,
-                       m.id AS source,
-                       m.name AS sourceLabel,
-                       m.name AS sourceType,
-                       'blu' AS targetType,
-                       'component_blu' AS type
-                  FROM {block_blumod} bm
-                  JOIN {block_blu} blu ON blu.id = bm.blu
-                  JOIN {modules} m ON m.id = bm.module
-                 WHERE bm.course = :courseid
-              ORDER BY blu.description, m.name";
-
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
-    }
-
-    /**
-     */
-    public static function competency_blu_relations(int $courseid): array {
-        global $DB;
-
-        $sql = "SELECT bc.id AS relid,
-                       blu.id AS target,
-                       blu.description AS targetLabel,
-                       comp.id AS source,
-                       comp.shortname AS sourceLabel,
-                       'blu' AS targetType,
-                       'competency' AS sourceType,
-                       'competency_blu' AS type
-                  FROM {block_blucompetency} bc
-                  JOIN {block_blu} blu ON blu.id = bc.bluid
-                  JOIN {competency} comp ON comp.id = bc.competencyid
-                 WHERE blu.course = :courseid
-              ORDER BY blu.description, comp.shortname";
-
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
-    }
-
-    /**
-     */
-    public static function course_structure(int $courseid): array {
+    public static function get_course_structure(int $courseid): array {
         global $DB;
 
         $blus = $DB->get_records('block_blu', ['course' => $courseid], '', 'id, description');
@@ -88,17 +16,14 @@ class repository {
         }
 
         $bluids = array_keys($blus);
-        $bluLabel = function (int $id) use ($blus, $DB): ?string {
-            if (isset($blus[$id])) {
-                return $blus[$id]->description;
-            }
-            return $DB->get_field('block_blu', 'description', ['id' => $id]) ?: null;
+        $bluLabel = function (int $id) use ($blus): ?string {
+                return $blus[$id]->description ?? null;
         };
 
         [$insql, $params] = $DB->get_in_or_equal($bluids);
         $rows = [];
 
-        // Componentes
+        // Componentes (sub-learning units)
         $subs = $DB->get_records_select('block_blusub', "id_blu $insql", $params);
         foreach ($subs as $s) {
             $rows[] = (object) [
@@ -132,7 +57,7 @@ class repository {
             if (empty($connected[$id])) {
                 $rows[] = (object) [
                     'source'      => $id,
-                    'sourceLabel' => $lu->description,
+                    'sourceLabel' => $blu->description,
                     'target'      => null,
                     'targetLabel' => null,
                     'type'        => null,
@@ -144,12 +69,145 @@ class repository {
     }
 
     /**
-     * Envuelve un array de stdClass/arrays asociativos en el contrato
-     * "SPARQL-results" ({results:{bindings:[...]}}) que ya consumen
-     * graph.js y table.js. 
-     *
-     * @param array $records
-     * @return array
+     * Query ForjaLens: learning_units_without_resources()
+     */
+    public static function get_learningunits_without_resources(int $courseid): array {
+        global $DB;
+
+        $sql = "SELECT blu.id AS bluid, blu.description AS name
+                  FROM {block_blu} blu
+             LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
+                 WHERE blu.course = :courseid
+                   AND bm.id IS NULL
+              ORDER BY blu.description";
+
+        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+    }
+
+    /**
+     * Query ForjaLens: resources_without_learning_units()
+     */
+    public static function get_resources_without_learning_units(int $courseid): array {
+        global $DB;
+
+        $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
+        $sql = "SELECT cm.id id, cm.instance instance, m.name AS module_name
+                     FROM {course_modules} cm
+                      LEFT JOIN {modules} m ON m.id = cm.module
+                      LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                     WHERE cm.deletioninprogress = :deletioninprogress
+                      AND cm.course = :courseid
+                      AND bm.id IS NULL
+                     ORDER BY cm.section,cm.id ASC";
+        $modules = $DB->get_records_sql($sql, $params);
+        $resources = [];
+
+        foreach ($modules as $module) {            
+            $result = $DB->get_record($module->module_name,['id'=>$module->instance]);
+            $resources[] = (object)[
+                'itemType' => $module->module_name,
+                'label' => $result->name,
+            ];
+        }
+
+        $params = ['courseid' => $courseid];
+        $sql = "SELECT gi.id, gi.itemname, 'Calificador: '
+                     FROM {grade_items} gi
+                     LEFT JOIN {block_blumod} bm ON bm.module = gi.id
+                     WHERE gi.courseid = :courseid
+                      AND gi.itemtype = 'manual'
+                     ORDER BY gi.id ASC";
+        $gradeitems = $DB->get_records_sql($sql, $params);
+
+        foreach ($gradeitems as $gradeitem) {
+
+            $resources[] = (object)[
+                'itemType' => 'Calificador manual',
+                'label' => $gradeitem->itemname,
+            ];
+        }
+
+
+
+        return self::to_bindings($resources);
+    }
+
+    /**
+     * Query ForjaLens: resource_learningunit_relations()
+     * TODO
+     */
+    public static function get_resource_learningunit_relations(int $courseid): array {
+        global $DB;
+
+        $sql = "SELECT bm.id AS relid,
+                       bm.module AS source,
+                       blu.id AS target,
+                       m.name AS sourceLabel,
+                       blu.description AS targetLabel,
+                       'module' AS sourceType,
+                       'blu' AS targetType,
+                       'component_blu' AS type
+                  FROM {block_blumod} bm
+                  JOIN {modules} m ON m.id = bm.module
+                  JOIN {block_blu} blu ON blu.id = bm.blu
+                 WHERE bm.course = :courseid
+              ORDER BY blu.description, m.name";
+
+        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+    }
+
+    /**
+     * Query ForjaLens: learningunit_resource_relations()
+     * TODO, ni siquera aparece en el selector
+     */
+    public static function get_learningunit_resource_relations(int $courseid): array {
+        global $DB;
+
+        $sql = "SELECT blu.id AS source,
+                       bm.module AS target,
+                       blu.description AS sourceLabel,
+                       m.name AS targetLabel,
+                       'blu' AS sourceType,
+                       'module' AS targetType,
+                       'lu_module' AS type
+                  FROM {block_blu} blu
+             LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
+             LEFT JOIN {modules} m ON m.id = bm.module
+                 WHERE blu.course = :courseid
+              ORDER BY blu.description, m.name";
+
+        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+    }
+
+    /**
+     * Query ForjaLens: assessmentitem_learningunit_relations()
+     * TODO
+     */
+    public static function get_assessmentitem_learningunit_relations(int $courseid): array {
+        global $DB;
+
+        $sql = "SELECT bc.id AS relid,
+                       blu.id AS target,
+                       blu.description AS targetLabel,
+                       comp.id AS source,
+                       comp.shortname AS sourceLabel,
+                       'competency' AS sourceType,
+                       'blu' AS targetType,
+                       'competency_blu' AS type
+                  FROM {block_blucompetency} bc
+                  JOIN {block_blu} blu ON blu.id = bc.bluid
+                  JOIN {competency} comp ON comp.id = bc.competencyid
+                 WHERE blu.course = :courseid
+              ORDER BY blu.description, comp.shortname";
+
+        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+    }
+
+    
+    /**
+     * Wrapper para el resultado de las queries y obtener los bindings
+     * {results: {bindings: [{field: {type: "literal", value: "..."}}]}}
+     * Usado en by graph.js and table.js
      */
     private static function to_bindings(array $records): array {
         $bindings = [];
@@ -157,9 +215,8 @@ class repository {
         foreach ($records as $record) {
             $row = [];
             foreach ((array) $record as $key => $value) {
-                // "relid" es un id técnico interno de la fila SQL, no un
-                // campo del grafo: se descarta igual que se haría con
-                // una variable SPARQL no seleccionada por el frontend.
+                // "relid" is internal technical ID, not a graph field
+                // Excluded like SPARQL unselected variables
                 if ($key === 'relid' || $value === null || $value === '') {
                     continue;
                 }
