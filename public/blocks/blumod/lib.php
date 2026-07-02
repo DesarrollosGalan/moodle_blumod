@@ -11,8 +11,7 @@ require_once(RAIZ_MOODLE."/config.php");//Necesitamos la configuracion de Moodle
 require_once($CFG->libdir.'/moodlelib.php');
 
 
-function block_blumod_has_permissions()
-{
+function block_blumod_has_permissions() {
     global $USER;
     // global $USER, $COURSE;
     
@@ -26,5 +25,3 @@ function block_blumod_has_permissions()
         return false;
     }
 }
-
-

@@ -115,6 +115,13 @@ class block_blumod extends block_base {
         $html .= html_writer::link($url, $linktext);
         $html .= html_writer::end_tag('p');
 
+        $html .= html_writer::start_tag('p');
+        $linktext = get_string('semanticview', 'block_blumod');
+        // $url = new moodle_url('/blocks/blumod/semantic_views.php', ['courseid' => $COURSE->id]);
+        $url = new moodle_url('/blocks/blumod/graph/view.php', ['courseid' => $COURSE->id]);
+        $html .= html_writer::link($url, $linktext);
+        $html .= html_writer::end_tag('p');
+
         $this->content->text =  $html;
 
         return $this->content;

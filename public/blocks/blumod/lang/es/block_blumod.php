@@ -41,3 +41,9 @@ $string['collapseall'] = 'Contraer todo';
 $string['expandall'] = 'Expandir todo';
 $string['assignblusresource'] = 'Asignar BLUs a recurso';
 $string['resourcesincourse'] = 'Recursos en el curso';
+$string['semanticview'] = 'Consultas semánticas';
+$string['semanticviews_url'] = 'URL de consultas semánticas';
+$string['semanticviews_url_help'] = 'Introduzca la URL que contendrá las consultas semánticas. Los administradores deben configurar esta URL para el bloque.';
+$string['semanticviews_query'] = 'Seleccione una consulta SQL';
+$string['semanticviews_view'] = 'Mostrar';
+
