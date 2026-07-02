@@ -23,7 +23,7 @@ class repository {
     public static function blus_without_components(int $courseid): array {
         global $DB;
 
-        $sql = "SELECT blu.id AS lu bluid, blu.description AS name
+        $sql = "SELECT blu.id AS bluid, blu.description AS name
                   FROM {block_blu} blu
              LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
                  WHERE blu.course = :courseid
