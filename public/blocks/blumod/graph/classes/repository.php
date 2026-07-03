@@ -23,7 +23,7 @@ class repository {
         [$insql, $params] = $DB->get_in_or_equal($bluids);
         $rows = [];
 
-        // Componentes (sub-learning units)
+        // Componentes
         $subs = $DB->get_records_select('block_blusub', "id_blu $insql", $params);
         foreach ($subs as $s) {
             $rows[] = (object) [
@@ -91,7 +91,7 @@ class repository {
         global $DB;
 
         $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
-        $sql = "SELECT cm.id id, cm.instance instance, m.name AS module_name
+        $sql = "SELECT cm.id AS cmid, cm.instance AS instance, m.name AS module_name
                      FROM {course_modules} cm
                       LEFT JOIN {modules} m ON m.id = cm.module
                       LEFT JOIN {block_blumod} bm ON bm.module = cm.id
@@ -139,6 +139,51 @@ class repository {
     public static function get_resource_learningunit_relations(int $courseid): array {
         global $DB;
 
+
+        $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
+        $sql = "SELECT  cm.id AS cmid,
+                        cm.instance AS instance,
+                        m.name AS module_name,
+                        bm.module AS bmmodule,
+                        blu.id AS bluid,
+                        blu.description AS bludescription
+                     FROM {course_modules} cm
+                      LEFT JOIN {modules} m ON m.id = cm.module
+                      LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                      LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                     WHERE cm.deletioninprogress = :deletioninprogress
+                      AND cm.course = :courseid
+                     ORDER BY cm.section,cm.id ASC";
+        $modules = $DB->get_records_sql($sql, $params);
+        $resources = [];
+
+        foreach ($modules as $module) {
+            $result = $DB->get_record($module->module_name,['id'=>$module->instance]);
+            if ($module->bluid === null) {
+                $resources[] = (object)[
+                    'source' => 'cm-' . $module->cmid,
+                    'sourceLabel' => $module->module_name . ': ' . $result->name,
+                    'sourceType' => $module->module_name,
+                    'target' => null,
+                    'targetLabel' => null,
+                    'targetType' => null,
+                    'type' => null,
+                ];
+            } else {
+                $resources[] = (object)[
+                    'source' => 'cm-' . $module->cmid,
+                    'sourceLabel' => $module->module_name . ': ' . $result->name,
+                    'sourceType' => $module->module_name,
+                    'target' => 'blu-' . $module->bluid,
+                    'targetLabel' => $module->bludescription,
+                    'targetType' => 'blu',
+                    'type' => 'resource_learningunit',
+                ];
+            }
+
+        }
+
+        /*
         $sql = "SELECT bm.id AS relid,
                        bm.module AS source,
                        blu.id AS target,
@@ -154,6 +199,9 @@ class repository {
               ORDER BY blu.description, m.name";
 
         return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+        */
+
+        return self::to_bindings($resources);
     }
 
     /**

@@ -103,7 +103,7 @@ function setView(mode, bindings) {
         } else if (mode === 'compound') {
             renderCompoundGraph(bindings);
         } else {
-            renderCompoundGraph(bindings);
+            renderGraph(bindings);
         }
     }
 
