@@ -21,12 +21,12 @@ class repository {
         };
 
         [$insql, $params] = $DB->get_in_or_equal($bluids);
-        $rows = [];
+        $results = [];
 
         // Componentes
         $subs = $DB->get_records_select('block_blusub', "id_blu $insql", $params);
         foreach ($subs as $s) {
-            $rows[] = (object) [
+            $results[] = (object) [
                 'source'      => $s->id_blu,
                 'sourceLabel' => $bluLabel((int) $s->id_blu),
                 'target'      => $s->id_sub,
@@ -38,7 +38,7 @@ class repository {
         // Prerequisitos
         $pres = $DB->get_records_select('block_blupre', "id_blu $insql", $params);
         foreach ($pres as $p) {
-            $rows[] = (object) [
+            $results[] = (object) [
                 'source'      => $p->id_blu,
                 'sourceLabel' => $bluLabel((int) $p->id_blu),
                 'target'      => $p->id_pre,
@@ -49,13 +49,13 @@ class repository {
 
         // BLUs sin ninguna relación (nodos aislados)
         $connected = [];
-        foreach ($rows as $r) {
+        foreach ($results as $r) {
             $connected[$r->source] = true;
             $connected[$r->target] = true;
         }
         foreach ($blus as $id => $blu) {
             if (empty($connected[$id])) {
-                $rows[] = (object) [
+                $results[] = (object) [
                     'source'      => $id,
                     'sourceLabel' => $blu->description,
                     'target'      => null,
@@ -65,7 +65,7 @@ class repository {
             }
         }
 
-        return self::to_bindings($rows);
+        return self::to_bindings($results);
     }
 
     /**
@@ -100,13 +100,13 @@ class repository {
                       AND bm.id IS NULL
                      ORDER BY cm.section,cm.id ASC";
         $modules = $DB->get_records_sql($sql, $params);
-        $resources = [];
+        $results = [];
 
         foreach ($modules as $module) {            
-            $result = $DB->get_record($module->module_name,['id'=>$module->instance]);
-            $resources[] = (object)[
+            $module_item = $DB->get_record($module->module_name,['id'=>$module->instance]);
+            $results[] = (object)[
                 'itemType' => $module->module_name,
-                'label' => $result->name,
+                'label' => $module_item->name,
             ];
         }
 
@@ -121,7 +121,7 @@ class repository {
 
         foreach ($gradeitems as $gradeitem) {
 
-            $resources[] = (object)[
+            $results[] = (object)[
                 'itemType' => 'Calificador manual',
                 'label' => $gradeitem->itemname,
             ];
@@ -129,7 +129,7 @@ class repository {
 
 
 
-        return self::to_bindings($resources);
+        return self::to_bindings($results);
     }
 
     /**
@@ -154,14 +154,14 @@ class repository {
                       AND cm.course = :courseid
                      ORDER BY cm.section,cm.id ASC";
         $modules = $DB->get_records_sql($sql, $params);
-        $resources = [];
+        $results = [];
 
         foreach ($modules as $module) {
-            $result = $DB->get_record($module->module_name,['id'=>$module->instance]);
+            $module_item = $DB->get_record($module->module_name,['id'=>$module->instance]);
             if ($module->bluid === null) {
-                $resources[] = (object)[
+                $results[] = (object)[
                     'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $result->name,
+                    'sourceLabel' => $module->module_name . ': ' . $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => null,
                     'targetLabel' => null,
@@ -169,9 +169,9 @@ class repository {
                     'type' => null,
                 ];
             } else {
-                $resources[] = (object)[
+                $results[] = (object)[
                     'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $result->name,
+                    'sourceLabel' => $module->module_name . ': ' . $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => 'blu-' . $module->bluid,
                     'targetLabel' => $module->bludescription,
@@ -182,7 +182,7 @@ class repository {
 
         }
 
-        return self::to_bindings($resources);
+        return self::to_bindings($results);
     }
 
     /**
@@ -206,13 +206,13 @@ class repository {
                       AND cm.course = :courseid
                      ORDER BY cm.section,cm.id ASC";
         $blumods = $DB->get_records_sql($sql, $params);
-        $resources = [];
+        $results = [];
 
 
         foreach ($blumods as $blumod) {
-            $result = $DB->get_record($blumod->module_name,['id'=>$blumod->instance]);
+            $module_item = $DB->get_record($blumod->module_name,['id'=>$blumod->instance]);
             if ($blumod->bluid === null) {
-                $resources[] = (object)[
+                $results[] = (object)[
                     'source' => 'blu-' . $blumod->bluid,
                     'sourceLabel' =>  $blumod->bludescription,
                     'sourceType' => 'blu',
@@ -222,12 +222,12 @@ class repository {
                     'type' => null,
                 ];
             } else {
-                $resources[] = (object)[
+                $results[] = (object)[
                     'source' => 'blu-' . $blumod->bluid,
                     'sourceLabel' => $blumod->bludescription,
                     'sourceType' => 'blu',
                     'target' => 'cm-' . $blumod->cmid,
-                    'targetLabel' => $blumod->module_name . ': ' . $result->name,
+                    'targetLabel' => $blumod->module_name . ': ' . $module_item->name,
                     'targetType' => $blumod->module_name,
 
                     'type' => 'resource_learningunit',
@@ -236,7 +236,7 @@ class repository {
 
         }
 
-        return self::to_bindings($resources);
+        return self::to_bindings($results);
 
     }
 
@@ -283,26 +283,9 @@ class repository {
 
 
             }
-            return self::to_bindings($results);
         }
 
-        /*
-        $sql = "SELECT bc.id AS relid,
-                       blu.id AS target,
-                       blu.description AS targetLabel,
-                       comp.id AS source,
-                       comp.shortname AS sourceLabel,
-                       'competency' AS sourceType,
-                       'blu' AS targetType,
-                       'competency_blu' AS type
-                  FROM {block_blucompetency} bc
-                  JOIN {block_blu} blu ON blu.id = bc.bluid
-                  JOIN {competency} comp ON comp.id = bc.competencyid
-                 WHERE blu.course = :courseid
-              ORDER BY blu.description, comp.shortname";
-
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
-        */
+        return self::to_bindings($results);
     }
 
     
