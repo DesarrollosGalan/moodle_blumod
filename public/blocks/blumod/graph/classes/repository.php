@@ -134,7 +134,6 @@ class repository {
 
     /**
      * Query ForjaLens: resource_learningunit_relations()
-     * TODO
      */
     public static function get_resource_learningunit_relations(int $courseid): array {
         global $DB;
@@ -183,48 +182,62 @@ class repository {
 
         }
 
-        /*
-        $sql = "SELECT bm.id AS relid,
-                       bm.module AS source,
-                       blu.id AS target,
-                       m.name AS sourceLabel,
-                       blu.description AS targetLabel,
-                       'module' AS sourceType,
-                       'blu' AS targetType,
-                       'component_blu' AS type
-                  FROM {block_blumod} bm
-                  JOIN {modules} m ON m.id = bm.module
-                  JOIN {block_blu} blu ON blu.id = bm.blu
-                 WHERE bm.course = :courseid
-              ORDER BY blu.description, m.name";
-
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
-        */
-
         return self::to_bindings($resources);
     }
 
     /**
      * Query ForjaLens: learningunit_resource_relations()
-     * TODO, ni siquera aparece en el selector
      */
     public static function get_learningunit_resource_relations(int $courseid): array {
         global $DB;
 
-        $sql = "SELECT blu.id AS source,
-                       bm.module AS target,
-                       blu.description AS sourceLabel,
-                       m.name AS targetLabel,
-                       'blu' AS sourceType,
-                       'module' AS targetType,
-                       'lu_module' AS type
-                  FROM {block_blu} blu
-             LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
-             LEFT JOIN {modules} m ON m.id = bm.module
-                 WHERE blu.course = :courseid
-              ORDER BY blu.description, m.name";
+        $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
+        $sql = "SELECT  cm.id AS cmid,
+                        cm.instance AS instance,
+                        m.name AS module_name,
+                        bm.module AS bmmodule,
+                        blu.id AS bluid,
+                        blu.description AS bludescription
+                     FROM {block_blumod} bm
+                      LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                      LEFT JOIN {course_modules} cm ON cm.id = bm.module
+                      LEFT JOIN {modules} m ON m.id = cm.module
+                     WHERE cm.deletioninprogress = :deletioninprogress
+                      AND cm.course = :courseid
+                     ORDER BY cm.section,cm.id ASC";
+        $blumods = $DB->get_records_sql($sql, $params);
+        $resources = [];
 
-        return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+
+        foreach ($blumods as $blumod) {
+            $result = $DB->get_record($blumod->module_name,['id'=>$blumod->instance]);
+            if ($blumod->bluid === null) {
+                $resources[] = (object)[
+                    'source' => 'blu-' . $blumod->bluid,
+                    'sourceLabel' =>  $blumod->bludescription,
+                    'sourceType' => 'blu',
+                    'target' => null,
+                    'targetLabel' => null,
+                    'targetType' => null,
+                    'type' => null,
+                ];
+            } else {
+                $resources[] = (object)[
+                    'source' => 'blu-' . $blumod->bluid,
+                    'sourceLabel' => $blumod->bludescription,
+                    'sourceType' => 'blu',
+                    'target' => 'cm-' . $blumod->cmid,
+                    'targetLabel' => $blumod->module_name . ': ' . $result->name,
+                    'targetType' => $blumod->module_name,
+
+                    'type' => 'resource_learningunit',
+                ];
+            }
+
+        }
+
+        return self::to_bindings($resources);
+
     }
 
     /**
@@ -234,6 +247,46 @@ class repository {
     public static function get_assessmentitem_learningunit_relations(int $courseid): array {
         global $DB;
 
+        $params = ['courseid' => $courseid];
+        $sql = "SELECT gi.id AS giid, gi.itemname AS itemname, blu.id AS bluid, blu.description AS bludescription
+                     FROM {grade_items} gi
+                     LEFT JOIN {block_blumod} bm ON bm.module = gi.id
+                     LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                     WHERE gi.courseid = :courseid
+                      AND gi.itemtype = 'manual'
+                     ORDER BY gi.id ASC";
+        $gradeitems = $DB->get_records_sql($sql, $params);
+        $results = [];
+
+        foreach ($gradeitems as $gradeitem) {
+        
+            if ($gradeitem->bluid === null) {
+                $results[] = (object)[
+                    'source' => 'gi-' . $gradeitem->giid,
+                    'sourceLabel' =>  $gradeitem->itemname,
+                    'sourceType' => 'calificador',
+                    'target' => null,
+                    'targetLabel' => null,
+                    'targetType' => null,
+                    'type' => null,
+            ];
+            } else {
+                $results[] = (object)[
+                    'source' => 'gi-' . $gradeitem->giid,
+                    'sourceLabel' => $gradeitem->itemname,
+                    'sourceType' => 'calificador',
+                    'target' => 'blu-' . $gradeitem->bluid,
+                    'targetLabel' => $gradeitem->bludescription,
+                    'targetType' => 'blu',
+                    'type' => 'assessmentitem_learningunit',
+                ];
+
+
+            }
+            return self::to_bindings($results);
+        }
+
+        /*
         $sql = "SELECT bc.id AS relid,
                        blu.id AS target,
                        blu.description AS targetLabel,
@@ -249,6 +302,7 @@ class repository {
               ORDER BY blu.description, comp.shortname";
 
         return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
+        */
     }
 
     

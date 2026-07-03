@@ -54,11 +54,11 @@ echo html_writer::script('
     <option value="get_resource_learningunit_relations" data-mode="graph">
         Recursos &rarr; Learning Units (BLU)
     </option>
-    <option value="get_assessmentitem_learningunit_relations" data-mode="graph">
-        AssessmentItems &rarr; Learning Units (BLU)
-    </option>
     <option value="get_learningunit_resource_relations" data-mode="graph">
         Learning Units (BLU) &rarr; Recursos
+    </option>
+    <option value="get_assessmentitem_learningunit_relations" data-mode="graph">
+        AssessmentItems &rarr; Learning Units (BLU)
     </option>    
     <option value="get_course_structure" data-mode="obsidian">
         Course Structure
