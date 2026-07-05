@@ -46,7 +46,7 @@ echo html_writer::script('
 <label for="querySelect"><?php echo get_string('semanticviews_query', 'block_blumod'); ?>:</label>
 <select id="querySelect">
     <option value="get_learningunits_without_resources_assessments" data-mode="table">
-        Learning Units (BLU) sin recursos ni Assessments
+        Learning Units (BLU) sin recursos ni assessments
     </option>
     <option value="get_resources_without_learning_units" data-mode="table">
         Recursos sin Learning Units (BLU)

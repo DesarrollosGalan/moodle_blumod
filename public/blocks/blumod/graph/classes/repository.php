@@ -94,16 +94,20 @@ class repository {
 
     /**
      * Query ForjaLens: learning_units_without_resources()
+     * Puede darse el caso que se asigne alguna "resource" de la tabla {modules} y que no esté ni en BLUMOD_RESOURCE_MODULE_TYPES ni en BLUMOD_ASSESSMENT_MODULE_TYPES. 
+     * En ese caso, se considerará que tiene alguna asignación al tener un registro en la tabla {block_blumod}, y no se muestra en esta consulta.
      */
     public static function get_learningunits_without_resources_assessements(int $courseid): array {
         global $DB;
 
-        $sql = "SELECT blu.id AS bluid, blu.description AS name
-                  FROM {block_blu} blu
-             LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
-                 WHERE blu.course = :courseid
-                   AND bm.id IS NULL
-              ORDER BY blu.description";
+        $sql = "SELECT 
+                  blu.id AS bluid, 
+                  blu.description AS name
+                FROM {block_blu} blu
+                LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
+                WHERE blu.course = :courseid
+                  AND bm.id IS NULL
+                ORDER BY blu.description";
 
         return self::to_bindings($DB->get_records_sql($sql, ['courseid' => $courseid]));
     }
@@ -122,15 +126,18 @@ class repository {
         [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'grwlu');
         $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
         $params = array_merge($params, $modulefilterparams);
-        $sql = "SELECT cm.id AS cmid, cm.instance AS instance, m.name AS module_name
-                     FROM {course_modules} cm
-                      LEFT JOIN {modules} m ON m.id = cm.module
-                      LEFT JOIN {block_blumod} bm ON bm.module = cm.id
-                     WHERE cm.deletioninprogress = :deletioninprogress
-                      AND cm.course = :courseid
-                      AND $modulefiltersql
-                      AND bm.id IS NULL
-                     ORDER BY cm.id ASC";
+        $sql = "SELECT 
+                  cm.id AS cmid, 
+                  cm.instance AS instance, 
+                  m.name AS module_name
+                FROM {course_modules} cm
+                LEFT JOIN {modules} m ON m.id = cm.module
+                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                WHERE cm.deletioninprogress = :deletioninprogress
+                  AND cm.course = :courseid
+                  AND $modulefiltersql
+                  AND bm.id IS NULL
+                ORDER BY cm.id ASC";
         $modules = $DB->get_records_sql($sql, $params);
         $results = [];
 
@@ -141,26 +148,6 @@ class repository {
                 'label' => $module_item->name,
             ];
         }
-
-        /*
-        $params = ['courseid' => $courseid];
-        $sql = "SELECT gi.id, gi.itemname, 'Calificador: '
-                     FROM {grade_items} gi
-                     LEFT JOIN {block_blumod} bm ON bm.module = gi.id
-                     WHERE gi.courseid = :courseid
-                      AND gi.itemtype = 'manual'
-                     ORDER BY gi.id ASC";
-        $gradeitems = $DB->get_records_sql($sql, $params);
-
-        foreach ($gradeitems as $gradeitem) {
-
-            $results[] = (object)[
-                'itemType' => 'Calificador manual',
-                'label' => $gradeitem->itemname,
-            ];
-        }
-        */
-
 
         return self::to_bindings($results);
     }
@@ -179,20 +166,22 @@ class repository {
         $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
         [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'grlr');
         $params = array_merge($params, $modulefilterparams);
-        $sql = "SELECT  cm.id AS cmid,
-                        cm.instance AS instance,
-                        m.name AS module_name,
-                        bm.module AS bmmodule,
-                        blu.id AS bluid,
-                        blu.description AS bludescription
-                     FROM {course_modules} cm
-                      LEFT JOIN {modules} m ON m.id = cm.module
-                      LEFT JOIN {block_blumod} bm ON bm.module = cm.id
-                      LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                     WHERE cm.deletioninprogress = :deletioninprogress
-                      AND cm.course = :courseid
-                      AND $modulefiltersql
-                     ORDER BY cm.id ASC";
+        $sql = "SELECT 
+                  COALESCE(bm.id, -cm.id) AS relid,
+                  cm.id AS cmid,
+                  cm.instance AS instance,
+                   m.name AS module_name,
+                  bm.module AS bmmodule,
+                  blu.id AS bluid,
+                  blu.description AS bludescription
+                FROM {course_modules} cm
+                LEFT JOIN {modules} m ON m.id = cm.module
+                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                WHERE cm.deletioninprogress = :deletioninprogress
+                  AND cm.course = :courseid
+                  AND $modulefiltersql
+                ORDER BY cm.id ASC";
         $modules = $DB->get_records_sql($sql, $params);
         $results = [];
 
@@ -205,7 +194,7 @@ class repository {
                     'sourceType' => $module->module_name,
                     'target' => null,
                     'targetLabel' => null,
-                    'targetType' => null,
+                    'targetType' => null, 
                     'type' => null,
                 ];
             } else {
@@ -239,29 +228,30 @@ class repository {
         $params = ['courseid' => $courseid, 'modulecourseid' => $courseid, 'deletioninprogress' => '0'];
         [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'glrr');
         $params = array_merge($params, $modulefilterparams);
-        $sql = "SELECT  COALESCE(-rel.bmid, blu.id) AS relid,
-                    rel.bmid AS bmid,
-                    rel.cmid AS cmid,
-                    rel.instance AS instance,
-                    rel.module_name AS module_name,
-                    rel.bmmodule AS bmmodule,
-                    blu.id AS bluid,
-                        blu.description AS bludescription
+        $sql = "SELECT 
+                  COALESCE(rel.bmid, -blu.id) AS relid,
+                  rel.bmid AS bmid,
+                  rel.cmid AS cmid,
+                  rel.instance AS instance,
+                  rel.module_name AS module_name,
+                  rel.bmmodule AS bmmodule,
+                  blu.id AS bluid,
+                  blu.description AS bludescription
                 FROM {block_blu} blu
                 LEFT JOIN (
-                   SELECT bm.id AS bmid,
-                      bm.blu AS bluid,
-                      bm.module AS bmmodule,
-                      cm.id AS cmid,
-                      cm.instance AS instance,
-                      m.name AS module_name
-                     FROM {block_blumod} bm
-                   INNER JOIN {course_modules} cm ON cm.id = bm.module
-                   INNER JOIN {modules} m ON m.id = cm.module
-                    WHERE cm.course = :modulecourseid
-                      AND cm.deletioninprogress = :deletioninprogress
-                      AND $modulefiltersql
-                  ) rel ON rel.bluid = blu.id
+                  SELECT bm.id AS bmid,
+                    bm.blu AS bluid,
+                    bm.module AS bmmodule,
+                    cm.id AS cmid,
+                    cm.instance AS instance,
+                    m.name AS module_name
+                  FROM {block_blumod} bm
+                  INNER JOIN {course_modules} cm ON cm.id = bm.module
+                  INNER JOIN {modules} m ON m.id = cm.module
+                  WHERE cm.course = :modulecourseid
+                    AND cm.deletioninprogress = :deletioninprogress
+                    AND $modulefiltersql
+                ) rel ON rel.bluid = blu.id
                 WHERE blu.course = :courseid
                 ORDER BY blu.id ASC, rel.cmid ASC";
         $blus = $DB->get_records_sql($sql, $params);
@@ -305,16 +295,76 @@ class repository {
     public static function get_assessmentitem_learningunit_relations(int $courseid): array {
         global $DB;
 
-        $params = ['courseid' => $courseid];
-        $sql = "SELECT gi.id AS giid, gi.itemname AS itemname, blu.id AS bluid, blu.description AS bludescription
-                     FROM {grade_items} gi
-                     LEFT JOIN {block_blumod} bm ON bm.module = gi.id
-                     LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                     WHERE gi.courseid = :courseid
-                      AND gi.itemtype = 'manual'
-                     ORDER BY gi.id ASC";
-        $gradeitems = $DB->get_records_sql($sql, $params);
+        $assessmenttypes = self::get_assessment_module_types();
+        if (empty($assessmenttypes)) {
+            return self::to_bindings([]);
+        }
+
+        $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
+        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $assessmenttypes, 'galr');
+        $params = array_merge($params, $modulefilterparams);
+
+        $sql = "SELECT 
+                  COALESCE(bm.id, 'cm-' || cm.id) AS relid,
+                  cm.id AS cmid,
+                  cm.instance AS instance,
+                  m.name AS module_name,
+                  blu.id AS bluid,
+                  blu.description AS bludescription
+                FROM {course_modules} cm
+                LEFT JOIN {modules} m ON m.id = cm.module
+                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                WHERE cm.deletioninprogress = :deletioninprogress
+                  AND cm.course = :courseid
+                  AND $modulefiltersql
+                ORDER BY cm.id ASC";
+        $modules = $DB->get_records_sql($sql, $params);
         $results = [];
+
+        foreach ($modules as $module) {
+            $moduleitem = $DB->get_record($module->module_name, ['id' => $module->instance]);
+            if (!$moduleitem || empty($moduleitem->name)) {
+                continue;
+            }
+
+            if ($module->bluid === null) {
+                $results[] = (object)[
+                'source' => 'cm-' . $module->cmid,
+                    'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
+                    'sourceType' => $module->module_name,
+                    'target' => null,
+                    'targetLabel' => null,
+                    'targetType' => null,
+                    'type' => null,
+                ];
+            } else {
+                $results[] = (object)[
+                    'source' => 'cm-' . $module->cmid,
+                    'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
+                    'sourceType' => $module->module_name,
+                    'target' => 'blu-' . $module->bluid,
+                    'targetLabel' => $module->bludescription,
+                    'targetType' => 'lu',
+                    'type' => 'assessmentitem_learningunit',
+                ];
+            }
+        }
+        
+        $params = ['courseid' => $courseid];
+        $sql = "SELECT 
+                  COALESCE(bm.id, 'gi-' || gi.id) AS relid,
+                  gi.id AS giid, 
+                  gi.itemname AS itemname, 
+                  blu.id AS bluid, 
+                  blu.description AS bludescription
+                FROM {grade_items} gi
+                LEFT JOIN {block_blumod} bm ON bm.module = gi.id
+                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                WHERE gi.courseid = :courseid
+                  AND gi.itemtype = 'manual'
+                ORDER BY gi.id ASC";
+        $gradeitems = $DB->get_records_sql($sql, $params);
 
         foreach ($gradeitems as $gradeitem) {
         
@@ -339,58 +389,6 @@ class repository {
                     'type' => 'assessmentitem_learningunit',
                 ];
 
-
-            }
-        }
-
-        $assessmenttypes = self::get_assessment_module_types();
-        if (!empty($assessmenttypes)) {
-            $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
-            [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $assessmenttypes, 'gamt');
-            $params = array_merge($params, $modulefilterparams);
-
-            $sql = "SELECT cm.id AS cmid,
-                           cm.instance AS instance,
-                           m.name AS module_name,
-                           blu.id AS bluid,
-                           blu.description AS bludescription
-                      FROM {course_modules} cm
-                 LEFT JOIN {modules} m ON m.id = cm.module
-                 LEFT JOIN {block_blumod} bm ON bm.module = cm.id
-                 LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                     WHERE cm.deletioninprogress = :deletioninprogress
-                       AND cm.course = :courseid
-                       AND $modulefiltersql
-                  ORDER BY cm.id ASC";
-            $modules = $DB->get_records_sql($sql, $params);
-
-            foreach ($modules as $module) {
-                $moduleitem = $DB->get_record($module->module_name, ['id' => $module->instance]);
-                if (!$moduleitem || empty($moduleitem->name)) {
-                    continue;
-                }
-
-                if ($module->bluid === null) {
-                    $results[] = (object)[
-                        'source' => 'cm-' . $module->cmid,
-                        'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
-                        'sourceType' => $module->module_name,
-                        'target' => null,
-                        'targetLabel' => null,
-                        'targetType' => null,
-                        'type' => null,
-                    ];
-                } else {
-                    $results[] = (object)[
-                        'source' => 'cm-' . $module->cmid,
-                        'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
-                        'sourceType' => $module->module_name,
-                        'target' => 'blu-' . $module->bluid,
-                        'targetLabel' => $module->bludescription,
-                        'targetType' => 'lu',
-                        'type' => 'assessmentitem_learningunit',
-                    ];
-                }
             }
         }
 
