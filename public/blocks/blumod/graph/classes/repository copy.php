@@ -236,34 +236,26 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $params = ['courseid' => $courseid, 'modulecourseid' => $courseid, 'deletioninprogress' => '0'];
+        $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
         [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'glrr');
+        $modulefiltersql = "($modulefiltersql OR m.name IS NULL)";
         $params = array_merge($params, $modulefilterparams);
-        $sql = "SELECT  COALESCE(-rel.bmid, blu.id) AS relid,
-                    rel.bmid AS bmid,
-                    rel.cmid AS cmid,
-                    rel.instance AS instance,
-                    rel.module_name AS module_name,
-                    rel.bmmodule AS bmmodule,
-                    blu.id AS bluid,
+xdebug_break();
+        $sql = "SELECT  COALESCE(-bm.id, blu.id) AS relid,
+                        cm.id AS cmid,
+                        cm.instance AS instance,
+                        m.name AS module_name,
+                        bm.module AS bmmodule,
+                        blu.id AS bluid,
                         blu.description AS bludescription
-                FROM {block_blu} blu
-                LEFT JOIN (
-                   SELECT bm.id AS bmid,
-                      bm.blu AS bluid,
-                      bm.module AS bmmodule,
-                      cm.id AS cmid,
-                      cm.instance AS instance,
-                      m.name AS module_name
-                     FROM {block_blumod} bm
-                   INNER JOIN {course_modules} cm ON cm.id = bm.module
-                   INNER JOIN {modules} m ON m.id = cm.module
-                    WHERE cm.course = :modulecourseid
-                      AND cm.deletioninprogress = :deletioninprogress
+                     FROM {block_blu} blu
+                      LEFT JOIN {block_blumod} bm ON bm.blu = blu.id
+                      LEFT JOIN {course_modules} cm ON cm.id = bm.module
+                      LEFT JOIN {modules} m ON m.id = cm.module
+                     WHERE blu.course = :courseid
+                      AND (cm.deletioninprogress = :deletioninprogress OR cm.id IS NULL) 
                       AND $modulefiltersql
-                  ) rel ON rel.bluid = blu.id
-                WHERE blu.course = :courseid
-                ORDER BY blu.id ASC, rel.cmid ASC";
+                     ORDER BY blu.id ASC";
         $blus = $DB->get_records_sql($sql, $params);
         $results = [];
 

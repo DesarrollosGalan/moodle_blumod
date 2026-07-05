@@ -45,8 +45,8 @@ echo html_writer::script('
 
 <label for="querySelect"><?php echo get_string('semanticviews_query', 'block_blumod'); ?>:</label>
 <select id="querySelect">
-    <option value="get_learningunits_without_resources" data-mode="table">
-        Learning Units (BLU) sin recursos
+    <option value="get_learningunits_without_resources_assessments" data-mode="table">
+        Learning Units (BLU) sin recursos ni Assessments
     </option>
     <option value="get_resources_without_learning_units" data-mode="table">
         Recursos sin Learning Units (BLU)
@@ -81,8 +81,8 @@ echo html_writer::script('
 </table>
 
 <div id="wrapper" style="display:none;">
-    <div id="graph"></div>
     <div id="legend"></div>
+    <div id="graph"></div>
 </div>
 <div id="popup"></div>
 

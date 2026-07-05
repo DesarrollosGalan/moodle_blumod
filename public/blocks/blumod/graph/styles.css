@@ -35,6 +35,26 @@ th {
     margin-top: 20px;
 }
 
+#graphContainer {
+    display: none; /* oculto al inicio */
+    margin-top: 20px;
+}
+
+ #legend {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px; /* separación con el grafo */
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
 #graph {
     width: 100%;
     max-width: 100%;

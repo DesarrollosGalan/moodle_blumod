@@ -920,7 +920,7 @@ function renderLegend(edgeTypes, options = { showNodes: true, showEdges: true, n
     }
 
     legend.style.display = "flex";
-    legend.style.flexDirection = "column";
+    // legend.style.flexDirection = "column";
     legend.innerHTML = "";
 
     if (options.showNodes) {
@@ -935,7 +935,11 @@ function renderLegend(edgeTypes, options = { showNodes: true, showEdges: true, n
         });
 
         const NODE_LABELS = {
-            lu: "Learning Unit"
+            course: "Course",
+            lu: "Learning Unit",
+            resource: "Learning Resource",
+            assessment: "Assessment Item",
+            competence: "Competence"
         };
 
         sortedTypes.forEach(type => {
