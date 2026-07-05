@@ -28,6 +28,37 @@ class repository {
         return ["$field $insql", $params];
     }
 
+    private static function get_module_learningunit_rows(int $courseid, array $moduletypes, string $filterprefix): array {
+        global $DB;
+
+        if (empty($moduletypes)) {
+            return [];
+        }
+
+        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $moduletypes, $filterprefix);
+        $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
+        $params = array_merge($params, $modulefilterparams);
+
+        $sql = "SELECT
+                  COALESCE(bm.id, 'cm-' || cm.id) AS relid,
+                  cm.id AS cmid,
+                  cm.instance AS instance,
+                  m.name AS module_name,
+                  bm.module AS bmmodule,
+                  blu.id AS bluid,
+                  blu.description AS bludescription
+                FROM {course_modules} cm
+                LEFT JOIN {modules} m ON m.id = cm.module
+                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
+                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                WHERE cm.deletioninprogress = :deletioninprogress
+                  AND cm.course = :courseid
+                  AND $modulefiltersql
+                ORDER BY cm.id ASC";
+
+        return $DB->get_records_sql($sql, $params);
+    }
+
     /**
      * Query ForjaLens: course_structure()
      */
@@ -163,26 +194,7 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
-        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'grlr');
-        $params = array_merge($params, $modulefilterparams);
-        $sql = "SELECT 
-                  COALESCE(bm.id, -cm.id) AS relid,
-                  cm.id AS cmid,
-                  cm.instance AS instance,
-                   m.name AS module_name,
-                  bm.module AS bmmodule,
-                  blu.id AS bluid,
-                  blu.description AS bludescription
-                FROM {course_modules} cm
-                LEFT JOIN {modules} m ON m.id = cm.module
-                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
-                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                WHERE cm.deletioninprogress = :deletioninprogress
-                  AND cm.course = :courseid
-                  AND $modulefiltersql
-                ORDER BY cm.id ASC";
-        $modules = $DB->get_records_sql($sql, $params);
+        $modules = self::get_module_learningunit_rows($courseid, $resourcetypes, 'grlr');
         $results = [];
 
         foreach ($modules as $module) {
@@ -300,26 +312,7 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
-        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $assessmenttypes, 'galr');
-        $params = array_merge($params, $modulefilterparams);
-
-        $sql = "SELECT 
-                  COALESCE(bm.id, 'cm-' || cm.id) AS relid,
-                  cm.id AS cmid,
-                  cm.instance AS instance,
-                  m.name AS module_name,
-                  blu.id AS bluid,
-                  blu.description AS bludescription
-                FROM {course_modules} cm
-                LEFT JOIN {modules} m ON m.id = cm.module
-                LEFT JOIN {block_blumod} bm ON bm.module = cm.id
-                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                WHERE cm.deletioninprogress = :deletioninprogress
-                  AND cm.course = :courseid
-                  AND $modulefiltersql
-                ORDER BY cm.id ASC";
-        $modules = $DB->get_records_sql($sql, $params);
+        $modules = self::get_module_learningunit_rows($courseid, $assessmenttypes, 'galr');
         $results = [];
 
         foreach ($modules as $module) {
