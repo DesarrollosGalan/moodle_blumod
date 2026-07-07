@@ -54,3 +54,4 @@ $string['semanticviews_view4'] = 'Learning units (BLU) and resource relationship
 $string['semanticviews_view5'] = 'Assessment items and Learning Unit (BLU) relationships';
 $string['semanticviews_view6'] = 'Course structure';
 $string['semanticviews_view7'] = 'Course structure compound';
+$string['semanticviews_view_empty'] = 'No results available for this view';

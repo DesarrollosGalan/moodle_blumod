@@ -53,3 +53,4 @@ $string['semanticviews_view4'] = 'Learning units (BLU) eta baliabideen arteko er
 $string['semanticviews_view5'] = 'Ebaluazio elementu eta Learning Unit (BLU)-en arteko erlazioak';
 $string['semanticviews_view6'] = 'Ikastaroaren egitura';
 $string['semanticviews_view7'] = 'Ikastaroaren egitura konposatua';
+$string['semanticviews_empty'] = 'Ez dago emaitzarik ikuste horretan';

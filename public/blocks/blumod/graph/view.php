@@ -35,7 +35,8 @@ echo html_writer::script('
     window.FORJALENS = {
         wwwroot:  ' . json_encode($CFG->wwwroot) . ',
         sesskey:  ' . json_encode(sesskey()) . ',
-        courseid: ' . json_encode($courseid) . '
+        courseid: ' . json_encode($courseid) . ',
+        emptyMessage: ' . json_encode(get_string('semanticviews_view_empty', 'block_blumod')) . '
     };
 ');
 ?>
@@ -84,6 +85,9 @@ echo html_writer::script('
     <div id="graph"></div>
 </div>
 <div id="popup"></div>
+
+<div id="nodata" class="nodata"></div>
+
 
 <?php
 echo $OUTPUT->footer();

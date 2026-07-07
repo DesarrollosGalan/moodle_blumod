@@ -25,7 +25,7 @@ header('Content-Type: application/json; charset=utf-8');
 try {
     switch ($action) {
         case 'get_learningunits_without_resources_assessments':
-            echo json_encode(repository::get_learningunits_without_resources_assessements($courseid));
+            echo json_encode(repository::get_learningunits_without_resources($courseid));
             break;
 
         case 'get_resources_without_learning_units':

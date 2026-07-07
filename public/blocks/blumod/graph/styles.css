@@ -94,3 +94,8 @@ h2 {
     height: 25px;
     border-radius: 4px; 
 }
+
+.nodata {
+  font-size: 1.25rem;
+  font-weight: 600;
+}

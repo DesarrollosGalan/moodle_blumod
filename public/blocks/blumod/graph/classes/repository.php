@@ -14,7 +14,7 @@ class repository {
     }
 */
 
-    private static function get_module_learningunit_rows(int $courseid, array $moduletypes, string $filterprefix): array {
+    private static function get_resource_learningunit_relations_rows(int $courseid, array $moduletypes, string $filterprefix): array {
         global $DB;
 
         if (empty($moduletypes)) {
@@ -114,7 +114,7 @@ class repository {
      * Puede darse el caso que se asigne alguna "resource" de la tabla {modules} y que no esté ni en BLUMOD_LEARNINGRESOURCE_TYPES ni en BLUMOD_ASSESSMENTITEMS_TYPES. 
      * En ese caso, se considerará que tiene alguna asignación al tener un registro en la tabla {block_blumod}, y no se muestra en esta consulta.
      */
-    public static function get_learningunits_without_resources_assessements(int $courseid): array {
+    public static function get_learningunits_without_resources(int $courseid): array {
         global $DB;
 
         $sql = "SELECT 
@@ -182,7 +182,7 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $modules = self::get_module_learningunit_rows($courseid, $resourcetypes, 'grlr');
+        $modules = self::get_resource_learningunit_relations_rows($courseid, $resourcetypes, 'grlr');
         $results = [];
 
         foreach ($modules as $module) {
@@ -301,7 +301,7 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $modules = self::get_module_learningunit_rows($courseid, $resourcetypes, 'galr');
+        $modules = self::get_resource_learningunit_relations_rows($courseid, $resourcetypes, 'galr');
         $results = [];
 
         foreach ($modules as $module) {

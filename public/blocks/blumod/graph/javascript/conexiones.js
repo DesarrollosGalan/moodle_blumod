@@ -19,6 +19,7 @@ function initUI() {
         resultsTable: document.getElementById('resultsTable'),
         loadBtn: document.getElementById('loadBtn'),
         querySelect: document.getElementById('querySelect'),
+        nodata: document.getElementById('nodata'),
         // courseSelect: document.getElementById('courseSelect'),
     };
 
@@ -87,8 +88,20 @@ async function executeQuery() {
  * en las funciones ya existentes de table.js / graph.js.
  */
 function setView(mode, bindings) {
-    
+
+    /* Sin datos para mostrar */
+    if (!bindings.length) {
+        UI.nodata.style.display = 'block';
+        UI.graphContainer.style.display = 'none';
+        UI.resultsTable.style.display = 'none';
+        // renderNoDataMessage(UI.nodata, window.FORJALENS.emptyMessage);
+        UI.nodata.textContent = window.FORJALENS.emptyMessage || 'No hay resultados disponibles para esta visualización.';
+
+        return;
+    }
+
     if (mode === 'table') {
+        UI.nodata.style.display = 'none';
         UI.graphContainer.style.display = 'none';
         UI.resultsTable.style.display = 'block';
         renderTable(bindings, UI.resultsTable);
@@ -97,6 +110,7 @@ function setView(mode, bindings) {
 
     UI.resultsTable.style.display = 'none';
     UI.graphContainer.style.display = 'block';
+    UI.nodata.style.display = 'none';
 
     if (mode === 'obsidian') {
         renderObsidianGraph(bindings);

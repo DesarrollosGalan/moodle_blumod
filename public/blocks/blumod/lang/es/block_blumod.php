@@ -53,3 +53,4 @@ $string['semanticviews_view4'] = 'Relaciones entre Learning Units (BLU) y recurs
 $string['semanticviews_view5'] = 'Relaciones entre elementos de evaluación y Learning Units (BLU)';
 $string['semanticviews_view6'] = 'Estructura del curso';
 $string['semanticviews_view7'] = 'Estructura compuesta del curso';
+$string['semanticviews_empty'] = 'No hay resultados disponibles para esta visualización';
