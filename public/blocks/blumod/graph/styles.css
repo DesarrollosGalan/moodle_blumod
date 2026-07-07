@@ -4,13 +4,9 @@ body {
     margin: 30px;
 }
 
-#loadBtn {
-    padding: 0px 20px;
-    width: auto;
+button {
+    padding: 10px 20px;
     cursor: pointer;
-    vertical-align: middle;
-    height: 25px;
-    border-radius: 4px; 
 }
 
 table {
@@ -30,16 +26,10 @@ th {
 }
 
         /* CONTENEDOR GRAFO */
-#wrapper {
-    display: none; /* oculto al inicio */
-    margin-top: 20px;
-}
-
 #graphContainer {
     display: none; /* oculto al inicio */
     margin-top: 20px;
 }
-
  #legend {
     display: flex;
     flex-direction: row;
@@ -54,7 +44,6 @@ th {
     align-items: center;
     white-space: nowrap;
 }
-
 #graph {
     width: 100%;
     max-width: 100%;
@@ -88,4 +77,20 @@ h2 {
 #popup pre {
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* BLUMod */
+
+#wrapper {
+    display: none; /* oculto al inicio */
+    margin-top: 20px;
+}
+
+#loadBtn {
+    padding: 0px 20px;
+    width: auto;
+    cursor: pointer;
+    vertical-align: middle;
+    height: 25px;
+    border-radius: 4px; 
 }

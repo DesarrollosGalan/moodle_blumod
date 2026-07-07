@@ -2,31 +2,17 @@
 namespace blumod_graph;
 
 defined('MOODLE_INTERNAL') || die();
-require_once($CFG->dirroot . '/blocks/blumod/constants.php');
+require_once(__DIR__ . '/resource_types.php');
 class repository {
 
-    private static function get_resource_module_types(): array {
-        if (defined('BLUMOD_RESOURCE_MODULE_TYPES') && is_array(BLUMOD_RESOURCE_MODULE_TYPES)) {
-            return BLUMOD_RESOURCE_MODULE_TYPES;
-        }
-
-        return [];
-    }
-
-    private static function get_assessment_module_types(): array {
-        if (defined('BLUMOD_ASSESSMENT_MODULE_TYPES') && is_array(BLUMOD_ASSESSMENT_MODULE_TYPES)) {
-            return BLUMOD_ASSESSMENT_MODULE_TYPES;
-        }
-
-        return [];
-    }
-
-    private static function build_module_type_filter(string $field, array $types, string $prefix = 'modtype'): array {
+/*
+    private static function build_resource_types_filter(string $field, array $types, string $prefix = 'modtype'): array {
         global $DB;
 
         [$insql, $params] = $DB->get_in_or_equal($types, SQL_PARAMS_NAMED, $prefix);
         return ["$field $insql", $params];
     }
+*/
 
     private static function get_module_learningunit_rows(int $courseid, array $moduletypes, string $filterprefix): array {
         global $DB;
@@ -35,7 +21,7 @@ class repository {
             return [];
         }
 
-        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $moduletypes, $filterprefix);
+        [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $moduletypes, $filterprefix);
         $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
         $params = array_merge($params, $modulefilterparams);
 
@@ -125,7 +111,7 @@ class repository {
 
     /**
      * Query ForjaLens: learning_units_without_resources()
-     * Puede darse el caso que se asigne alguna "resource" de la tabla {modules} y que no esté ni en BLUMOD_RESOURCE_MODULE_TYPES ni en BLUMOD_ASSESSMENT_MODULE_TYPES. 
+     * Puede darse el caso que se asigne alguna "resource" de la tabla {modules} y que no esté ni en BLUMOD_LEARNINGRESOURCE_TYPES ni en BLUMOD_ASSESSMENTITEMS_TYPES. 
      * En ese caso, se considerará que tiene alguna asignación al tener un registro en la tabla {block_blumod}, y no se muestra en esta consulta.
      */
     public static function get_learningunits_without_resources_assessements(int $courseid): array {
@@ -149,12 +135,13 @@ class repository {
     public static function get_resources_without_learning_units(int $courseid): array {
         global $DB;
 
-        $resourcetypes = self::get_resource_module_types();
+        $resourcetypes = resource_types::get_learningresource_types();
+        $resourcetypes = array_merge($resourcetypes, resource_types::get_assessmentitem_types());
         if (empty($resourcetypes)) {
             return self::to_bindings([]);
         }
 
-        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'grwlu');
+        [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $resourcetypes, 'grwlu');
         $params = ['courseid' => $courseid,'deletioninprogress' => '0'];
         $params = array_merge($params, $modulefilterparams);
         $sql = "SELECT 
@@ -189,7 +176,8 @@ class repository {
     public static function get_resource_learningunit_relations(int $courseid): array {
         global $DB;
 
-        $resourcetypes = self::get_resource_module_types();
+        $resourcetypes = resource_types::get_learningresource_types();
+        $resourcetypes = array_merge($resourcetypes, resource_types::get_assessmentitem_types());
         if (empty($resourcetypes)) {
             return self::to_bindings([]);
         }
@@ -232,13 +220,14 @@ class repository {
     public static function get_learningunit_resource_relations(int $courseid): array {
         global $DB;
 
-        $resourcetypes = self::get_resource_module_types();
+        $resourcetypes = resource_types::get_learningresource_types();
+        $resourcetypes = array_merge($resourcetypes, resource_types::get_assessmentitem_types());
         if (empty($resourcetypes)) {
             return self::to_bindings([]);
         }
 
         $params = ['courseid' => $courseid, 'modulecourseid' => $courseid, 'deletioninprogress' => '0'];
-        [$modulefiltersql, $modulefilterparams] = self::build_module_type_filter('m.name', $resourcetypes, 'glrr');
+        [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $resourcetypes, 'glrr');
         $params = array_merge($params, $modulefilterparams);
         $sql = "SELECT 
                   COALESCE(rel.bmid, -blu.id) AS relid,
@@ -307,12 +296,12 @@ class repository {
     public static function get_assessmentitem_learningunit_relations(int $courseid): array {
         global $DB;
 
-        $assessmenttypes = self::get_assessment_module_types();
-        if (empty($assessmenttypes)) {
+        $resourcetypes = resource_types::get_assessmentitem_types();
+        if (empty($resourcetypes)) {
             return self::to_bindings([]);
         }
 
-        $modules = self::get_module_learningunit_rows($courseid, $assessmenttypes, 'galr');
+        $modules = self::get_module_learningunit_rows($courseid, $resourcetypes, 'galr');
         $results = [];
 
         foreach ($modules as $module) {

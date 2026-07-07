@@ -1,6 +1,9 @@
 <?php
 
+use blumod_graph\resource_types;
+
 defined('MOODLE_INTERNAL') || die();
+require_once($CFG->dirroot . '/blocks/blumod/graph/classes/resource_types.php');
 
 class resource_selector {
     /** @var int */
@@ -114,13 +117,20 @@ class resource_selector {
     {
         global $DB;
         
+
+
+        $resourcetypes = resource_types::get_learningresource_types();
+        $resourcetypes = array_merge($resourcetypes, resource_types::get_assessmentitem_types());
+        [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $resourcetypes, 'lr');
         $params = ['courseid' => $this->courseid,'deletioninprogress' => '0'];
+        $params = array_merge($params, $modulefilterparams);
         $sql = "SELECT cm.id, cm.instance, m.name module_name
                      FROM {course_modules} cm
                       LEFT  JOIN {modules} m 
                         ON cm.module = m.id
                      WHERE cm.deletioninprogress = :deletioninprogress
                       AND cm.course = :courseid
+                      AND $modulefiltersql
                      ORDER BY cm.section,cm.id ASC";
         $modules = $DB->get_records_sql($sql, $params);
 

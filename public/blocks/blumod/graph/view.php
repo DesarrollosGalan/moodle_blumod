@@ -13,7 +13,7 @@ $PAGE->set_context($context);
 $PAGE->set_course($course);
 $PAGE->set_title(get_string('semanticview', 'block_blumod'));
 $PAGE->set_heading($course->fullname);
-$PAGE->set_pagelayout('report');
+$PAGE->set_pagelayout('standard');
 
 // Librerías de terceros para Cytoscape (igual que en index.html original).
 $PAGE->requires->js(new moodle_url('https://unpkg.com/cytoscape/dist/cytoscape.min.js'), true);
@@ -41,30 +41,29 @@ echo html_writer::script('
 ?>
 
 <h2><?php echo get_string('semanticview', 'block_blumod'); ?></h2>
-<p><?php echo format_string($course->fullname); ?></p>
 
 <label for="querySelect"><?php echo get_string('semanticviews_query', 'block_blumod'); ?>:</label>
 <select id="querySelect">
     <option value="get_learningunits_without_resources_assessments" data-mode="table">
-        Learning Units (BLU) sin recursos ni assessments
+         <?php echo get_string('semanticviews_view1', 'block_blumod'); ?>
     </option>
     <option value="get_resources_without_learning_units" data-mode="table">
-        Recursos sin Learning Units (BLU)
+        <?php echo get_string('semanticviews_view2', 'block_blumod'); ?>
     </option>
     <option value="get_resource_learningunit_relations" data-mode="graph">
-        Recursos &rarr; Learning Units (BLU)
+        <?php echo get_string('semanticviews_view3', 'block_blumod'); ?>
     </option>
     <option value="get_learningunit_resource_relations" data-mode="graph">
-        Learning Units (BLU) &rarr; Recursos
+        <?php echo get_string('semanticviews_view4', 'block_blumod'); ?>
     </option>
     <option value="get_assessmentitem_learningunit_relations" data-mode="graph">
-        AssessmentItems &rarr; Learning Units (BLU)
+        <?php echo get_string('semanticviews_view5', 'block_blumod'); ?>
     </option>    
     <option value="get_course_structure" data-mode="obsidian">
-        Course Structure
+        <?php echo get_string('semanticviews_view6', 'block_blumod'); ?>
     </option>
     <option value="get_course_structure" data-mode="compound">
-        Course Structure compound
+        <?php echo get_string('semanticviews_view7', 'block_blumod'); ?>
     </option>
 </select>
 
