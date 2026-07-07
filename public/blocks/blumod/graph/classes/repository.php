@@ -190,7 +190,7 @@ class repository {
             if ($module->bluid === null) {
                 $results[] = (object)[
                     'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $module_item->name,
+                    'sourceLabel' => $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => null,
                     'targetLabel' => null,
@@ -200,7 +200,7 @@ class repository {
             } else {
                 $results[] = (object)[
                     'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $module_item->name,
+                    'sourceLabel' => $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => 'blu-' . $module->bluid,
                     'targetLabel' => $module->bludescription,
@@ -277,7 +277,7 @@ class repository {
                     'sourceLabel' => $blu->bludescription,
                     'sourceType' => 'lu',
                     'target' => 'cm-' . $blu->cmid,
-                    'targetLabel' => $blu->module_name . ': ' . $module_item->name,
+                    'targetLabel' => $module_item->name,
                     'targetType' => $blu->module_name,
                     'type' => 'resource_learningunit',
                 ];
@@ -313,7 +313,7 @@ class repository {
             if ($module->bluid === null) {
                 $results[] = (object)[
                 'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
+                    'sourceLabel' => $moduleitem->name,
                     'sourceType' => $module->module_name,
                     'target' => null,
                     'targetLabel' => null,
@@ -323,7 +323,7 @@ class repository {
             } else {
                 $results[] = (object)[
                     'source' => 'cm-' . $module->cmid,
-                    'sourceLabel' => $module->module_name . ': ' . $moduleitem->name,
+                    'sourceLabel' => $moduleitem->name,
                     'sourceType' => $module->module_name,
                     'target' => 'blu-' . $module->bluid,
                     'targetLabel' => $module->bludescription,
