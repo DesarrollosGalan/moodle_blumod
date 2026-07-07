@@ -94,8 +94,7 @@ function setView(mode, bindings) {
         UI.nodata.style.display = 'block';
         UI.graphContainer.style.display = 'none';
         UI.resultsTable.style.display = 'none';
-        // renderNoDataMessage(UI.nodata, window.FORJALENS.emptyMessage);
-        UI.nodata.textContent = window.FORJALENS.emptyMessage || 'No hay resultados disponibles para esta visualización.';
+        UI.nodata.textContent = window.FORJALENS.emptyMessage;
 
         return;
     }
