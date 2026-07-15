@@ -24,7 +24,7 @@ $PAGE->requires->js(new moodle_url('https://unpkg.com/cytoscape-expand-collapse/
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/graph.js'), true);
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/table.js'), true);
 $PAGE->requires->js(new moodle_url('/blocks/blumod/graph/javascript/conexiones.js'), true);
-$PAGE->requires->css(new moodle_url('/blocks/blumod/graph/styles.css'));
+$PAGE->requires->css(new moodle_url('/blocks/blumod/graph/style.css'));
 
 
 echo $OUTPUT->header();

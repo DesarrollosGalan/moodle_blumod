@@ -45,6 +45,51 @@ class repository {
         return $DB->get_records_sql($sql, $params);
     }
 
+    private static function get_gradeitems_learningunit_relations_rows(int $courseid, string $relationType): array {
+        global $DB;
+
+        $params = ['courseid' => $courseid];
+        $sql = "SELECT 
+                  COALESCE(bm.id, 'gi-' || gi.id) AS relid,
+                  gi.id AS giid, 
+                  gi.itemname AS itemname, 
+                  blu.id AS bluid, 
+                  blu.description AS bludescription
+                FROM {grade_items} gi
+                LEFT JOIN {block_blumod} bm ON bm.module = gi.id
+                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
+                WHERE gi.courseid = :courseid
+                  AND gi.itemtype = 'manual'
+                ORDER BY gi.id ASC";
+        $gradeitems = $DB->get_records_sql($sql, $params);
+        
+        $results = [];
+        foreach ($gradeitems as $gradeitem) {
+            if ($gradeitem->bluid === null) {
+                $results[] = (object)[
+                    'source' => 'gi-' . $gradeitem->giid,
+                    'sourceLabel' =>  $gradeitem->itemname,
+                    'sourceType' => 'manual',
+                    'target' => null,
+                    'targetLabel' => null,
+                    'targetType' => null,
+                    'type' => null,
+                ];
+            } else {
+                $results[] = (object)[
+                    'source' => 'gi-' . $gradeitem->giid,
+                    'sourceLabel' => $gradeitem->itemname,
+                    'sourceType' => 'manual',
+                    'target' => 'blu-' . $gradeitem->bluid,
+                    'targetLabel' => $gradeitem->bludescription,
+                    'targetType' => 'lu',
+                    'type' => $relationType,
+                ];
+            }
+        }
+        return $results;
+    }
+
     /**
      * Query ForjaLens: course_structure()
      */
@@ -211,47 +256,7 @@ class repository {
 
         }
 
-        
-        $params = ['courseid' => $courseid];
-        $sql = "SELECT 
-                  COALESCE(bm.id, 'gi-' || gi.id) AS relid,
-                  gi.id AS giid, 
-                  gi.itemname AS itemname, 
-                  blu.id AS bluid, 
-                  blu.description AS bludescription
-                FROM {grade_items} gi
-                LEFT JOIN {block_blumod} bm ON bm.module = gi.id
-                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                WHERE gi.courseid = :courseid
-                  AND gi.itemtype = 'manual'
-                ORDER BY gi.id ASC";
-        $gradeitems = $DB->get_records_sql($sql, $params);
-
-        foreach ($gradeitems as $gradeitem) {
-        
-            if ($gradeitem->bluid === null) {
-                $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
-                    'sourceLabel' =>  $gradeitem->itemname,
-                    'sourceType' => 'manual',
-                    'target' => null,
-                    'targetLabel' => null,
-                    'targetType' => null,
-                    'type' => null,
-            ];
-            } else {
-                $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
-                    'sourceLabel' => $gradeitem->itemname,
-                    'sourceType' => 'manual',
-                    'target' => 'blu-' . $gradeitem->bluid,
-                    'targetLabel' => $gradeitem->bludescription,
-                    'targetType' => 'lu',
-                    'type' => 'resource_learningunit',
-                ];
-
-            }
-        }
+        $results = array_merge($results, self::get_gradeitems_learningunit_relations_rows($courseid, 'resource_learningunit'));
 
         return self::to_bindings($results);
     }
@@ -374,47 +379,8 @@ class repository {
                 ];
             }
         }
-        
-        $params = ['courseid' => $courseid];
-        $sql = "SELECT 
-                  COALESCE(bm.id, 'gi-' || gi.id) AS relid,
-                  gi.id AS giid, 
-                  gi.itemname AS itemname, 
-                  blu.id AS bluid, 
-                  blu.description AS bludescription
-                FROM {grade_items} gi
-                LEFT JOIN {block_blumod} bm ON bm.module = gi.id
-                LEFT JOIN {block_blu} blu ON blu.id = bm.blu
-                WHERE gi.courseid = :courseid
-                  AND gi.itemtype = 'manual'
-                ORDER BY gi.id ASC";
-        $gradeitems = $DB->get_records_sql($sql, $params);
 
-        foreach ($gradeitems as $gradeitem) {
-        
-            if ($gradeitem->bluid === null) {
-                $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
-                    'sourceLabel' =>  $gradeitem->itemname,
-                    'sourceType' => 'manual',
-                    'target' => null,
-                    'targetLabel' => null,
-                    'targetType' => null,
-                    'type' => null,
-            ];
-            } else {
-                $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
-                    'sourceLabel' => $gradeitem->itemname,
-                    'sourceType' => 'manual',
-                    'target' => 'blu-' . $gradeitem->bluid,
-                    'targetLabel' => $gradeitem->bludescription,
-                    'targetType' => 'lu',
-                    'type' => 'assessmentitem_learningunit',
-                ];
-
-            }
-        }
+        $results = array_merge($results, self::get_gradeitems_learningunit_relations_rows($courseid, 'assessmentitem_learningunit'));
 
         return self::to_bindings($results);
     }
