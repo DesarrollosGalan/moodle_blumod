@@ -216,11 +216,17 @@ const NODE_COLORS = {
     folder: "#fd7e14",
     wiki: "#858796",
     imscp: "#6f42c1",
+    scorm: "#9b59b6",
+    h5pactivity: "#e74c3c",
+    data: "#16a085",
     assign: "#ff8a65",
     quiz: "#f39c12",
     forum: "#f8a5c2",
     workshop: "#4b77be",
     lesson: "#f6d55c",
+    choice: "#27ae60",
+    questionnaire: "#c0392b",
+    manual: "#34495e",
     lu: "#2ecc71"
 };
 
@@ -921,6 +927,9 @@ function renderLegend(edgeTypes, options = { showNodes: true, showEdges: true, n
 
     legend.style.display = "flex";
     // legend.style.flexDirection = "column";
+   // legend.style.flexDirection = "row";
+  //  legend.style.flexWrap = "wrap"; 
+  //  legend.style.gap = "12px"; 
     legend.innerHTML = "";
 
     if (options.showNodes) {
