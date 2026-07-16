@@ -5,15 +5,6 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/resource_types.php');
 class repository {
 
-/*
-    private static function build_resource_types_filter(string $field, array $types, string $prefix = 'modtype'): array {
-        global $DB;
-
-        [$insql, $params] = $DB->get_in_or_equal($types, SQL_PARAMS_NAMED, $prefix);
-        return ["$field $insql", $params];
-    }
-*/
-
     private static function get_resource_learningunit_relations_rows(int $courseid, array $moduletypes, string $filterprefix): array {
         global $DB;
 
@@ -24,9 +15,8 @@ class repository {
         [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $moduletypes, $filterprefix);
         $params = ['courseid' => $courseid, 'deletioninprogress' => '0'];
         $params = array_merge($params, $modulefilterparams);
-
         $sql = "SELECT
-                  COALESCE(bm.id, 'cm-' || cm.id) AS relid,
+                  COALESCE(bm.id, CONCAT('cm-', cm.id)) AS relid,
                   cm.id AS cmid,
                   cm.instance AS instance,
                   m.name AS module_name,
@@ -50,7 +40,7 @@ class repository {
 
         $params = ['courseid' => $courseid];
         $sql = "SELECT 
-                  COALESCE(bm.id, 'gi-' || gi.id) AS relid,
+                  COALESCE(bm.id, CONCAT('gi-', gi.id)) AS relid,
                   gi.id AS giid, 
                   gi.itemname AS itemname, 
                   blu.id AS bluid, 
@@ -67,7 +57,7 @@ class repository {
         foreach ($gradeitems as $gradeitem) {
             if ($gradeitem->bluid === null) {
                 $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
+                    'source' => $gradeitem->giid,
                     'sourceLabel' =>  $gradeitem->itemname,
                     'sourceType' => 'manual',
                     'target' => null,
@@ -77,7 +67,7 @@ class repository {
                 ];
             } else {
                 $results[] = (object)[
-                    'source' => 'gi-' . $gradeitem->giid,
+                    'source' => $gradeitem->giid,
                     'sourceLabel' => $gradeitem->itemname,
                     'sourceType' => 'manual',
                     'target' => 'blu-' . $gradeitem->bluid,
@@ -234,7 +224,7 @@ class repository {
             $module_item = $DB->get_record($module->module_name,['id'=>$module->instance]);
             if ($module->bluid === null) {
                 $results[] = (object)[
-                    'source' => 'cm-' . $module->cmid,
+                    'source' => $module->cmid,
                     'sourceLabel' => $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => null,
@@ -244,7 +234,7 @@ class repository {
                 ];
             } else {
                 $results[] = (object)[
-                    'source' => 'cm-' . $module->cmid,
+                    'source' => $module->cmid,
                     'sourceLabel' => $module_item->name,
                     'sourceType' => $module->module_name,
                     'target' => 'blu-' . $module->bluid,
@@ -273,11 +263,11 @@ class repository {
             return self::to_bindings([]);
         }
 
-        $params = ['courseid' => $courseid, 'modulecourseid' => $courseid, 'deletioninprogress' => '0'];
+        $params = ['courseid' => $courseid, 'modulecourseid' => $courseid, 'gicourseid' => $courseid, 'deletioninprogress' => '0', 'itemtype' => 'manual'];
         [$modulefiltersql, $modulefilterparams] = resource_types::build_resource_types_filter('m.name', $resourcetypes, 'glrr');
         $params = array_merge($params, $modulefilterparams);
         $sql = "SELECT 
-                  COALESCE(rel.bmid, -blu.id) AS relid,
+                  COALESCE(rel.bmid, CONCAT('blu-', blu.id)) AS relid,
                   rel.bmid AS bmid,
                   rel.cmid AS cmid,
                   rel.instance AS instance,
@@ -299,6 +289,17 @@ class repository {
                   WHERE cm.course = :modulecourseid
                     AND cm.deletioninprogress = :deletioninprogress
                     AND $modulefiltersql
+                  UNION ALL
+                  SELECT bm.id AS bmid,
+                    bm.blu AS bluid,
+                    bm.module AS bmmodule,
+                    NULL AS cmid,
+                    gi.id AS instance,
+                    'manual' AS module_name
+                  FROM {block_blumod} bm
+                  INNER JOIN {grade_items} gi ON gi.id = bm.module
+                  WHERE gi.courseid = :gicourseid
+                    AND gi.itemtype = :itemtype
                 ) rel ON rel.bluid = blu.id
                 WHERE blu.course = :courseid
                 ORDER BY blu.id ASC, rel.cmid ASC";
@@ -307,9 +308,9 @@ class repository {
 
         foreach ($blus as $blu) {
             
-            if ($blu->bmid === null) {
+            if ($blu->bmid === null) { // BLU sin ningún recurso asociado
                 $results[] = (object)[
-                    'source' => 'blu-' . $blu->bluid,
+                    'source' => $blu->bluid,
                     'sourceLabel' =>  $blu->bludescription,
                     'sourceType' => 'lu',
                     'target' => null,
@@ -317,17 +318,30 @@ class repository {
                     'targetType' => null,
                     'type' => null,
                 ];
-            } else {
-                $module_item = $DB->get_record($blu->module_name,['id'=>$blu->instance]);
-                $results[] = (object)[
-                    'source' => 'blu-' . $blu->bluid,
-                    'sourceLabel' => $blu->bludescription,
-                    'sourceType' => 'lu',
-                    'target' => 'cm-' . $blu->cmid,
-                    'targetLabel' => $module_item->name,
-                    'targetType' => $blu->module_name,
-                    'type' => 'resource_learningunit',
-                ];
+            } else { // BLU con recurso asociado
+                if ($blu->module_name === 'manual') { // BLU con recurso {grade_items} (calificador manual)
+                    $grade_item = $DB->get_record('grade_items',['id'=>$blu->instance]);
+                    $results[] = (object)[
+                        'source' => $blu->bluid,
+                        'sourceLabel' =>  $blu->bludescription,
+                        'sourceType' => 'lu',
+                        'target' => 'gi-' . $grade_item->id,
+                        'targetLabel' => $grade_item->itemname,
+                        'targetType' => 'manual',
+                        'type' => 'resource_learningunit',
+                    ];                
+                } else { // BLU con recurso {course_module}
+                    $module_item = $DB->get_record($blu->module_name,['id'=>$blu->instance]);
+                    $results[] = (object)[
+                        'source' => $blu->bluid,
+                        'sourceLabel' =>  $blu->bludescription,
+                        'sourceType' => 'lu',
+                        'target' => 'cm-' . $blu->cmid,
+                        'targetLabel' => $module_item->name,
+                        'targetType' => $blu->module_name,
+                        'type' => 'resource_learningunit',
+                    ];    
+                }
             }
 
         }
@@ -359,7 +373,7 @@ class repository {
 
             if ($module->bluid === null) {
                 $results[] = (object)[
-                'source' => 'cm-' . $module->cmid,
+                    'source' => $module->cmid,
                     'sourceLabel' => $moduleitem->name,
                     'sourceType' => $module->module_name,
                     'target' => null,
@@ -369,7 +383,7 @@ class repository {
                 ];
             } else {
                 $results[] = (object)[
-                    'source' => 'cm-' . $module->cmid,
+                    'source' => $module->cmid,
                     'sourceLabel' => $moduleitem->name,
                     'sourceType' => $module->module_name,
                     'target' => 'blu-' . $module->bluid,
